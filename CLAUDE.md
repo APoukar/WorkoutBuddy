@@ -21,6 +21,8 @@ xcodebuild test -project WorkoutBuddy.xcodeproj -scheme WorkoutBuddy -destinatio
 
 To check behaviour on the minimum OS, use `-destination 'platform=iOS Simulator,name=iPhone 16,OS=18.2'`.
 
+**CI:** `.github/workflows/ci.yml` builds the app and runs all unit tests on every pull request and every push to `main`. It runs on GitHub's `xcode-27` runner, using iPhone 17 on the latest iOS simulator. CI doesn't test on iOS 18, so the minimum-OS check above is still done locally. If a test fails, the `.xcresult` bundle is uploaded as a run artifact.
+
 ## Project setup
 - Targets: `WorkoutBuddy` (app, `net.poukar.WorkoutBuddy`) and `WorkoutBuddyTests` (unit tests, hosted in the app). A widget extension for the Live Activity comes in phase 4.
 - `WorkoutBuddy/` and `WorkoutBuddyTests/` are **synchronized folders**: any file added under them joins the target automatically. Don't edit `project.pbxproj` to add files.

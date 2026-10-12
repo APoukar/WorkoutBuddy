@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=latest
+
+jobs:
+  build-and-test:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build
+        run: >
+          xcodebuild build-for-testing
+          -project WorkoutBuddy.xcodeproj
+          -scheme WorkoutBuddy
+          -destination "$DESTINATION"
+          -derivedDataPath DerivedData
+          -quiet
+
+      - name: Test
+        run: >
+          xcodebuild test-without-building
+          -project WorkoutBuddy.xcodeproj
+          -scheme WorkoutBuddy
+          -destination "$DESTINATION"
+          -derivedDataPath DerivedData
+          -resultBundlePath TestResults.xcresult
+          -quiet
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TestResults
+          path: TestResults.xcresult
