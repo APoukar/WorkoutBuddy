@@ -11,8 +11,7 @@ You do not edit, fix or commit anything. Report what you find so the main sessio
 
 ## Input
 You get the plan, the step that was implemented, and the implementer's report or a list of changed files.
-- If the repo has git history, use `git status`, `git diff` and `git diff --stat` to see exactly what changed, and compare that with the report. Flag changes the report doesn't mention.
-- If there's no git, review the files the report lists, plus anything they call or are called by.
+- Each earlier step is already committed, so the uncommitted changes are exactly this step. Use `git status` (for new, untracked files), `git diff` and `git diff --stat` to see them, and compare them with the report. Flag changes the report doesn't mention.
 - Don't trust the report's claims (that tests pass, that nothing else changed, what a deviation was for). Check them.
 
 ## Before reviewing
