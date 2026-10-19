@@ -14,9 +14,10 @@ A personal iPhone app for planning gym workouts, running them set by set with gu
 ### F1 — Exercise library
 - Ships with ~40 common exercises, each tagged with a **muscle group** (Chest, Back, Shoulders, Biceps, Triceps, Legs, Glutes, Core, Full body). The list is seeded on first launch only.
 - Managed **only from Settings → Exercises**: a list grouped by muscle group, with search.
-- Add a custom exercise (name + muscle group), rename it, or change its muscle group.
-- Delete = **archive** (soft-delete). The exercise is hidden from the picker, but history and charts that reference it still work.
-- Names must be unique among active (non-archived) exercises, case-insensitive.
+- Add a custom exercise (name + muscle group). Any exercise, built-in or custom, can be renamed, moved to another muscle group, or deleted.
+- Delete = **archive** (soft-delete). The exercise is hidden from the picker, but history and charts that reference it still work. There is no restore in v1.
+- Deleting an exercise that's used in templates first shows a warning naming those templates. Confirming removes it from them, and a template left with no exercises has to be fixed before it can start. Past sessions are never changed.
+- Names must be unique among active (non-archived) exercises, case-insensitive. A deleted exercise's name can be reused, so two exercises with the same name can appear in history and progress.
 
 ### F2 — Workout templates (planning)
 - **Workouts tab**: list of templates showing name, exercise count and last-performed date. Create, edit and delete (soft-delete) templates.
@@ -85,14 +86,14 @@ A personal iPhone app for planning gym workouts, running them set by set with gu
 ### F9 — Settings
 - **Exercises** (F1 management).
 - **Defaults for new sets:** reps (10), kg (20) and rest (90 s).
-- **Weight step** for the +/- buttons: 0.5 / 1 / 1.25 / 2.5 kg (default 2.5).
+- **Weight step** for the +/- buttons: 0.5 / 1 / 2.5 kg (default 2.5), so weights always stay on the 0.5 kg grid.
 - **Rest-end alert:** sound on/off, haptics on/off.
 - **Export data** to JSON, as a manual backup through the share sheet.
 
 ## 4. Conceptual data model
 - **Exercise**: id, name, muscleGroup, isCustom, isArchived
-- **Workout** (template): id, name, createdAt, isDeleted → ordered **WorkoutExercise** (exercise ref) → ordered **PlannedSet** (reps, kg, restSeconds)
-- **WorkoutSession**: id, workout ref, startedAt, endedAt, pausedDuration, status (inProgress / completed / endedEarly) → ordered **SessionExercise** (exercise ref) → ordered **SessionSet** (planned reps/kg/rest, actual reps/kg, status done / skipped / notPerformed, completedAt)
+- **Workout** (template): id, name, createdAt, isSoftDeleted (named so because SwiftData models already have an `isDeleted` property), sessions (inverse of the session's workout ref) → ordered **WorkoutExercise** (exercise ref) → ordered **PlannedSet** (reps, kg, restSeconds)
+- **WorkoutSession**: id, workout ref, startedAt, endedAt, pausedDuration, status (inProgress / completed / endedEarly) → ordered **SessionExercise** (exercise ref) → ordered **SessionSet** (planned reps/kg/rest, actual reps/kg, status pending / done / skipped / notPerformed, completedAt)
 - Rules:
   - Sessions **copy the planned numbers**, because templates can change later.
   - Names are **not** copied. They're looked up through references, and workouts and exercises are soft-deleted so those references keep working.
