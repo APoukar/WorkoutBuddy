@@ -62,7 +62,7 @@ Both folders are synchronized, so new files join their targets automatically.
   - `WeightStep` uses String raw values, so `@AppStorage` can store it, plus a computed `kg: Double`.
 - **Seeding:** insert the seed list when the store has **no Exercise records at all**. Deleted (archived) exercises still count as records.
 - **Deleting an exercise:**
-  - `ExerciseLibrary.archive` sets `isArchived` and deletes the `WorkoutExercise` rows (cascading to their planned sets) that reference the exercise in any template. This includes soft-deleted templates, so no hidden references remain. The remaining exercises in each template are renumbered.
+  - `ExerciseLibrary.archive` sets `isArchived` and deletes the `WorkoutExercise` rows (cascading to their planned sets) that reference the exercise in any template. This includes soft-deleted templates, so no hidden references remain. The remaining exercises in each template are renumbered **before** the deletes, and everything is committed in **one** `save()`. If the save fails, `context.rollback()` runs and the error is rethrown.
   - Sessions are never touched.
   - A template can end up with no exercises. Phase 2 must show such a template as needing exercises and must not let it start.
 - **Formatting follows the user's locale:**
@@ -70,6 +70,7 @@ Both folders are synchronized, so new files join their targets automatically.
   - Rest uses `Duration.seconds(n).formatted(.time(pattern: .minuteSecond))`.
   - Durations also get a spoken label for VoiceOver (e.g. "1 minute 30 seconds").
 - **Saving:** every `ExerciseLibrary` change calls `context.save()` explicitly.
+- **Names are only trimmed at the ends.** Spaces inside a name are kept as typed (agreed in the step 3 review).
 
 ## Steps
 
@@ -123,7 +124,7 @@ Both folders are synchronized, so new files join their targets automatically.
 - `Features/Exercises/ExerciseLibrary.swift` is a `@MainActor` struct wrapping a `ModelContext`:
   - `validate(name:excluding:) -> ExerciseNameError?`, where the error is `.empty` or `.duplicate`. The editor calls it on every keystroke, and `add` and `rename` call it before saving.
   - `add(name:muscleGroup:)`, `rename(_:to:)` and `setMuscleGroup(_:_:)`.
-  - `workoutsUsing(_ exercise:) -> [Workout]`: the active templates (not soft-deleted) that contain the exercise, sorted by name. The delete warning uses it.
+  - `workoutsUsing(_ exercise:) throws -> [Workout]`: the active templates (not soft-deleted) that contain the exercise, sorted by name. The delete warning uses it.
   - `archive(_:)`: see "Deleting an exercise" above.
   - `exercise(id:)`, which doesn't filter out archived exercises.
 - `Features/Exercises/ExerciseGrouping.swift` (`nonisolated`):
@@ -131,9 +132,12 @@ Both folders are synchronized, so new files join their targets automatically.
   - Groups are in spec order and names are alphabetical. Search uses `localizedStandardContains`, and an empty query matches everything.
   - Phase 2's picker uses the group filter, and the Progress list in phase 6 reuses this.
 - `ExerciseDeletionWarning` (`nonisolated`, pure): builds the confirmation title and message from the exercise name and the affected template names. The rules:
-  - With no templates: "It stays in your history."
-  - With templates: list their names and say the exercise will be removed from them.
-  - If a template would be left with no exercises, name it and say so.
+  - The title is always `Delete “<name>”?`.
+  - With no templates, the message is "It stays in your history."
+  - With templates, the names go **inline** in one sentence, because alerts centre their text. At most 3 names are listed, then "and N more": "It will be removed from Push, Upper A and Full Body." or "It will be removed from Push, Pull, Legs and 2 more."
+  - If templates would be left with no exercises, a sentence follows in the same paragraph: "Push will have no exercises left and can’t be started until you add some." For several, use "Push and Legs …". Emptied templates are always named here, even when the cap left them out of the first sentence. Only names that are also in the template list are used.
+  - The message ends with a blank line, then "It stays in your history."
+  - `deletionWarning(for:)` on `ExerciseLibrary` builds the warning for a given exercise and `throws`.
 - Tests:
   - add, rename and change muscle group
   - empty and whitespace-only names
@@ -191,6 +195,7 @@ Both folders are synchronized, so new files join their targets automatically.
 
 ## Hooks left for later phases
 - `SetStatus.pending`, the session fields and `Workout.sessions` are already in V1. Phase 3 may add more V1 fields, such as pause and rest timestamps, until V1 is frozen.
+- **Phase 2: unsaved edits and the shared context.** `ExerciseLibrary` calls `save()` and `rollback()` on the whole main context, so they also commit or discard any unsaved edits elsewhere. Phase 2's plan must decide how the template editor keeps its unsaved edits apart, for example a separate `ModelContext` or saving after every edit.
 - Phase 2 must handle templates left with no exercises after an exercise is deleted. It reuses `ExerciseGrouping` (with the group filter), the value controls and `AppSettings.current`.
 - Phase 4: the Haptics toggle may not be honoured while the app is in the background (local notifications follow system settings). Revisit its wording then.
 - Every model has a stable `id` for the export in phase 7.
