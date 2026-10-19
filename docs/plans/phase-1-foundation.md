@@ -41,6 +41,9 @@ Both folders are synchronized, so new files join their targets automatically.
 - **Explicit order.** Every ordered child has `order: Int`, and the parent has a sorted accessor (`orderedExercises`, `orderedSets`).
 - **Relationships and delete rules:**
   - Parent → child relationships cascade: Workout → WorkoutExercise → PlannedSet, and WorkoutSession → SessionExercise → SessionSet.
+  - Every parent → child relationship has an explicit `inverse:` back to the parent (`WorkoutExercise.workout`, `PlannedSet.workoutExercise`, `SessionExercise.session`, `SessionSet.sessionExercise`). Without these, a deleted child stays in the parent's array after save, and on iOS 18 it can come back (found in the step 1 review).
+  - **A child is always removed with `context.delete`.** Removing it only from the parent's array leaves an orphaned row in the store.
+  - To-many arrays are **non-optional** (`= []`). CloudKit sync is out of scope.
   - `Workout.sessions` is the inverse of `WorkoutSession.workout`, with the `.nullify` delete rule. Phase 2 uses it for the last-performed date.
   - References to `Exercise` are plain optional relationships, with no inverse on Exercise.
   - Exercise and Workout are never hard-deleted.
@@ -51,7 +54,7 @@ Both folders are synchronized, so new files join their targets automatically.
   - **Rule:** V1 is frozen the first time the app goes onto a device with real data.
 - **Container failures and tests:**
   - When the app runs as the test host (the implementer finds a reliable check, e.g. the `XCTestConfigurationFilePath` environment variable), it uses an in-memory container. Tests never touch the real store.
-  - If the store fails to load, DEBUG builds delete the store files and retry once. Release builds stop with a `fatalError` and a clear message.
+  - If the store fails to load: **in the simulator only** (`#if targetEnvironment(simulator)`), delete the store files and retry once. On a device, in any build, stop with a `fatalError` and a clear message, so real history is never deleted.
 - **Name uniqueness is checked in code, not with `#Unique`.** Names are trimmed. The check compares case-insensitively against active exercises only, and skips the exercise being renamed.
 - **Settings use `@AppStorage`:**
   - `AppSettings` holds the keys, defaults and valid ranges.
@@ -78,19 +81,20 @@ Both folders are synchronized, so new files join their targets automatically.
   |---|---|
   | `Exercise` | id, name, muscleGroupRaw, isCustom, isArchived |
   | `Workout` | id, name, createdAt, isSoftDeleted, exercises, sessions |
-  | `WorkoutExercise` | id, order, exercise?, sets |
-  | `PlannedSet` | id, order, reps, kg: Double, restSeconds: Int |
+  | `WorkoutExercise` | id, order, workout?, exercise?, sets |
+  | `PlannedSet` | id, order, workoutExercise?, reps, kg: Double, restSeconds: Int |
   | `WorkoutSession` | id, workout?, startedAt, endedAt?, pausedDuration: TimeInterval, statusRaw, exercises |
-  | `SessionExercise` | id, order, exercise?, sets |
-  | `SessionSet` | id, order, plannedReps, plannedKg, plannedRestSeconds, actualReps?, actualKg?, statusRaw, completedAt? |
+  | `SessionExercise` | id, order, session?, exercise?, sets |
+  | `SessionSet` | id, order, sessionExercise?, plannedReps, plannedKg, plannedRestSeconds, actualReps?, actualKg?, statusRaw, completedAt? |
 
   Each model also gets the typealias and the sorted accessors.
 - `Persistence/ModelContainerFactory.swift`:
-  - `make(inMemory: Bool = false) throws -> ModelContainer`, with the DEBUG reset-and-retry.
+  - `make(inMemory: Bool = false) throws -> ModelContainer`, with the simulator-only reset-and-retry.
   - A test helper that keeps the container alive, not just its `mainContext`.
 - Tests:
   - Build a full workout and session graph, and check that the sorted accessors return children in `order`.
   - Deleting a Workout cascades to its children, **after `save()`**, and leaves the referenced Exercise in place.
+  - Deleting a single child (a `WorkoutExercise`, a `PlannedSet`, a `SessionSet`) and saving removes it from the parent's ordered accessor, and it doesn't come back after a further edit.
   - `Workout.sessions` contains the workout's sessions.
   - The raw values convert back to the right enum cases.
 - Also run the tests on iPhone 16 / iOS 18.2.
