@@ -160,11 +160,19 @@ Both folders are synchronized, so new files join their targets automatically.
 - `Shared/Formatters.swift`: the kg format, the m:ss rest format, and the spoken duration label.
 - Reusable controls in `Shared/Controls/`, which take a binding and use the `AppSettings` ranges:
   - `RepsStepper`.
-  - `WeightField`: a decimal-pad text field plus a stepper using the current weight step. The value snaps to the 0.5 grid when you finish editing, and parsing follows the user's locale.
+  - `WeightField`: a decimal-pad text field plus a stepper. The field reads the weight step from `@AppStorage` itself, so every screen follows the Settings value.
+    - The binding is updated on every keystroke that parses, snapped to the 0.5 grid. A button tapped mid-edit (e.g. Save or Done) therefore sees what's on screen.
+    - The value from when the field gained focus is remembered. While the text is empty or doesn't parse, the binding goes back to that value, so clearing the field never leaves an in-between value such as 2 from deleting "22.5". This stays the value from before editing even after a +/− press while focused (user's choice).
+    - While focused, the text is rewritten only when the binding changes to a value the text doesn't already stand for, using the same rule as the text handler: empty or invalid text stands for the value from focus time. So the field never refills itself while you clear it, and +/− presses and outside changes still update the text. The decision is a small `nonisolated` helper with tests.
+    - On focus loss, the field only reformats its text from the binding.
+    - The stepper uses `AppSettings.kgRange`, so − and + are disabled at 0 and 500 kg.
+    - VoiceOver: one stop for the field (reading its own text) and one for the stepper.
+    - The layout works at accessibility text sizes: no fixed width, and the row stacks vertically at accessibility sizes.
+    - The text → committed-value logic is a small `nonisolated` helper with unit tests.
   - `RestStepper`: steps of 15 s, displayed as m:ss, with the spoken label for VoiceOver.
 - Tests:
   - the formatters with a fixed locale (`en_US` and `cs_CZ`), so "22.5" and "22,5" both come out right
-  - parsing and snapping kg input
+  - parsing and snapping kg input. **Both "." and "," are accepted as the decimal separator in every locale.** Weights are at most 500, so there are no grouping separators. Only digits plus at most one separator, with **at most two digits after it**, are allowed, and anything else is rejected (nil): e.g. "12abc", "22.5.3", "1,000", "22.555". "22.55" is accepted and snaps to 22.5. Agreed in the step 4 review: the lenient locale parse turned "22,5" into 22 in en_US.
   - clamping in `current(in:)`, using a separate `UserDefaults(suiteName:)` instance, never `.standard`
   - `WeightStep` values and the default
 
@@ -210,4 +218,5 @@ Both folders are synchronized, so new files join their targets automatically.
   - Relaunch: nothing is seeded twice.
   - Change the settings and relaunch: the values persist.
   - Entering 22,5 in a Czech region is accepted.
+  - kg field editing, which was traced by hand in review but can't be unit-tested: backspace a value to empty and type a new one; clear it and tap Done (the original value comes back); press +/− while editing; type 22,5 with a US region.
 
