@@ -15,6 +15,7 @@ A personal iPhone app for planning gym workouts, running them set by set with gu
 - Ships with ~40 common exercises, each tagged with a **muscle group** (Chest, Back, Shoulders, Biceps, Triceps, Legs, Glutes, Core, Full body). The list is seeded on first launch only.
 - Managed **only from Settings → Exercises**: a list grouped by muscle group, with search.
 - Add a custom exercise (name + muscle group). Any exercise, built-in or custom, can be renamed, moved to another muscle group, or deleted.
+- Each exercise can optionally have its own **defaults for new sets** (reps, kg, rest), set in the exercise editor. Any of them can be left unset.
 - Delete = **archive** (soft-delete). The exercise is hidden from the picker, but history and charts that reference it still work. There is no restore in v1.
 - Deleting an exercise that's used in templates first shows a warning naming those templates. Confirming removes it from them, and a template left with no exercises has to be fixed before it can start. Past sessions are never changed.
 - Names must be unique among active (non-archived) exercises, case-insensitive. A deleted exercise's name can be reused, so two exercises with the same name can appear in history and progress.
@@ -26,7 +27,11 @@ A personal iPhone app for planning gym workouts, running them set by set with gu
   - "Add exercise" opens a picker over the predefined list, with search and a muscle-group filter. The picker can't create exercises (that's done in Settings).
   - Reorder and remove exercises.
   - For each exercise, a list of sets. Each set has **reps**, **kg** and **rest period** (seconds, shown as m:ss).
-  - "Add set" copies the previous set's values. The first set uses the defaults from Settings. Sets can be deleted.
+  - "Add set" copies the previous set's values. Sets can be deleted.
+  - The **first set** of an exercise takes each value (reps, kg, rest) from the first source that has one:
+    1. the exercise's own defaults (F1)
+    2. the values last used for that exercise in a template
+    3. the defaults from Settings (F9)
 - **Validation:** a template needs at least 1 exercise, and every exercise needs at least 1 set. Reps ≥ 1, kg ≥ 0 (0 = bodyweight) in 0.5 kg steps, rest 0–10 min.
 - Editing a template never changes past sessions.
 - From a template's detail view, you can **Start workout**.
@@ -85,13 +90,13 @@ A personal iPhone app for planning gym workouts, running them set by set with gu
 
 ### F9 — Settings
 - **Exercises** (F1 management).
-- **Defaults for new sets:** reps (10), kg (20) and rest (90 s).
+- **Defaults for new sets:** reps (10), kg (20) and rest (90 s). They're used when neither the exercise's own defaults nor values last used in a template exist (F2).
 - **Weight step** for the +/- buttons: 0.5 / 1 / 2.5 kg (default 2.5), so weights always stay on the 0.5 kg grid.
 - **Rest-end alert:** sound on/off, haptics on/off.
 - **Export data** to JSON, as a manual backup through the share sheet.
 
 ## 4. Conceptual data model
-- **Exercise**: id, name, muscleGroup, isCustom, isArchived
+- **Exercise**: id, name, muscleGroup, isCustom, isArchived, optional defaultReps / defaultKg / defaultRestSeconds
 - **Workout** (template): id, name, createdAt, isSoftDeleted (named so because SwiftData models already have an `isDeleted` property), sessions (inverse of the session's workout ref) → ordered **WorkoutExercise** (exercise ref) → ordered **PlannedSet** (reps, kg, restSeconds)
 - **WorkoutSession**: id, workout ref, startedAt, endedAt, pausedDuration, status (inProgress / completed / endedEarly) → ordered **SessionExercise** (exercise ref) → ordered **SessionSet** (planned reps/kg/rest, actual reps/kg, status pending / done / skipped / notPerformed, completedAt)
 - Rules:
@@ -99,15 +104,16 @@ A personal iPhone app for planning gym workouts, running them set by set with gu
   - Names are **not** copied. They're looked up through references, and workouts and exercises are soft-deleted so those references keep working.
 
 ## 5. Out of scope for v1 (candidates for later)
-Apple Watch app · iPad · iCloud sync / import · HealthKit · interactive Live Activity buttons (Done / Skip from Lock Screen) · "last time" hints · supersets / warm-up sets · lbs · Czech localization · +30 s rest extension.
+Apple Watch app · iPad · iCloud sync / import · HealthKit · interactive Live Activity buttons (Done / Skip from Lock Screen) · "last time" hints during a session (showing what you lifted last time; this is separate from the first-set defaults in F2) · supersets / warm-up sets · lbs · Czech localization · +30 s rest extension.
 
 ## 6. Open points (defaults chosen, revisit when planning)
 - **Accidental Done:** default is an **Undo** button on the rest screen that returns to the set.
 - **Weight changed mid-exercise:** a change applies to the current set only and doesn't carry over to the remaining sets.
+- **"Values last used in a template" (F2):** the default is the first set of that exercise in the template that was saved most recently, among active templates. Confirm this when planning phase 2.
 
 ## 7. Suggested implementation phases
 1. Foundation: Xcode project, SwiftData models, exercise seed, Settings → Exercises (F1, F9 basics)
-2. Workout templates (F2)
+2. Workout templates (F2), including per-exercise defaults for new sets (F1 editor fields, F2 first-set rule)
 3. Active session in the foreground + summary + save (F3, F5)
 4. Background: notifications + Live Activity (F4)
 5. History calendar + session detail (F6)
