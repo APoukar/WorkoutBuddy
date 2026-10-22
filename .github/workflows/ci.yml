@@ -32,6 +32,16 @@ jobs:
           -derivedDataPath DerivedData
           -quiet
 
+      - name: Build (Release)
+        run: >
+          xcodebuild build
+          -project WorkoutBuddy.xcodeproj
+          -scheme WorkoutBuddy
+          -configuration Release
+          -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath DerivedData-Release
+          -quiet
+
       - name: Test
         run: >
           xcodebuild test-without-building

@@ -38,14 +38,11 @@ struct ExerciseLibrary {
         return exercise
     }
 
-    func rename(_ exercise: Exercise, to name: String) throws {
+    /// Edits name and muscle group together: validates, sets both and saves once, so an edit is never half saved.
+    func update(_ exercise: Exercise, name: String, muscleGroup: MuscleGroup) throws {
         if let error = try checkName(name, excluding: exercise) { throw error }
         exercise.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        do { try context.save() } catch { context.rollback(); throw error }
-    }
-
-    func setMuscleGroup(_ exercise: Exercise, _ group: MuscleGroup) throws {
-        exercise.muscleGroup = group
+        exercise.muscleGroup = muscleGroup
         do { try context.save() } catch { context.rollback(); throw error }
     }
 

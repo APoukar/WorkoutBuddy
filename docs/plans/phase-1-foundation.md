@@ -124,7 +124,7 @@ Both folders are synchronized, so new files join their targets automatically.
 **Step 3 — Exercise library logic**
 - `Features/Exercises/ExerciseLibrary.swift` is a `@MainActor` struct wrapping a `ModelContext`:
   - `validate(name:excluding:) -> ExerciseNameError?`, where the error is `.empty` or `.duplicate`. The editor calls it on every keystroke, and `add` and `rename` call it before saving.
-  - `add(name:muscleGroup:)`, `rename(_:to:)` and `setMuscleGroup(_:_:)`.
+  - `add(name:muscleGroup:)` and `update(_:name:muscleGroup:)`. Step 6 replaced the original `rename` and `setMuscleGroup` with the single `update`, which saves once.
   - `workoutsUsing(_ exercise:) throws -> [Workout]`: the active templates (not soft-deleted) that contain the exercise, sorted by name. The delete warning uses it.
   - `archive(_:)`: see "Deleting an exercise" above.
   - `exercise(id:)`, which doesn't filter out archived exercises.
@@ -191,6 +191,13 @@ Both folders are synchronized, so new files join their targets automatically.
 - `Features/Exercises/ExerciseEditorView.swift`:
   - One sheet for both adding and editing, with a name field and a muscle-group picker.
   - Validation runs live through `validate`. Save is disabled while the name is invalid, and the error appears inline.
+    - For a new exercise, "Enter a name." is hidden on the blank form. It appears once the user has typed anything and then left the name empty. A duplicate error shows immediately. VoiceOver announces the error when it appears.
+    - The cursor starts in the name field when adding.
+    - Save calls a single `ExerciseLibrary.update(_:name:muscleGroup:)`, which validates, sets both fields and saves once with rollback, so an edit is never half saved. Library tests cover it.
+  - Errors show one alert with the neutral title "Something Went Wrong". The shared error-logging helper lives in `Shared/` and is also used by the app's launch seeding. The action label is logged as public.
+  - The delete-warning building code lives once in the shared delete flow.
+  - The list shows `ContentUnavailableView` "No Exercises" when every exercise has been deleted.
+  - Previews include editing Bench Press with the sample template. The preview data is compiled in every configuration, with no `#if DEBUG`, because a Debug-only helper broke the Release build.
   - When editing, a destructive **Delete Exercise** button at the bottom runs the same warning flow.
 - Previews use an in-memory, seeded container with one sample template.
 
@@ -219,5 +226,7 @@ Both folders are synchronized, so new files join their targets automatically.
   - Relaunch: nothing is seeded twice.
   - Change the settings and relaunch: the values persist.
   - Entering 22,5 in a Czech region is accepted.
+  - The delete alert's title doesn't go blank while the alert closes (step 6 review, finding 5).
+  - When adding an exercise, the cursor starts in the name field.
   - kg field editing, which was traced by hand in review but can't be unit-tested: backspace a value to empty and type a new one; clear it and tap Done (the original value comes back); press +/− while editing; type 22,5 with a US region.
 

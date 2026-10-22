@@ -24,9 +24,10 @@ struct ExerciseLibraryTests {
         let lib = ExerciseLibrary(context: tc.context)
         let e = try lib.add(name: "  Cable Fly  ", muscleGroup: .chest)
         #expect(e.name == "Cable Fly" && e.isCustom && e.muscleGroup == .chest)
-        try lib.rename(e, to: "Cable Crossover")
-        try lib.setMuscleGroup(e, .shoulders)
-        #expect(e.name == "Cable Crossover" && e.muscleGroup == .shoulders)
+        try lib.update(e, name: "Cable Crossover", muscleGroup: .chest)
+        #expect(e.name == "Cable Crossover")
+        try lib.update(e, name: "Cable Crossover", muscleGroup: .shoulders)
+        #expect(e.muscleGroup == .shoulders)
         #expect(lib.exercise(id: e.id) === e)
     }
 
@@ -46,7 +47,7 @@ struct ExerciseLibraryTests {
         #expect(lib.validate(name: " BENCH PRESS ") == .duplicate)
         #expect(throws: ExerciseNameError.duplicate) { try lib.add(name: "bench PRESS", muscleGroup: .chest) }
         let other = try lib.add(name: "Squat", muscleGroup: .legs)
-        #expect(throws: ExerciseNameError.duplicate) { try lib.rename(other, to: "bench press") }
+        #expect(throws: ExerciseNameError.duplicate) { try lib.update(other, name: "bench press", muscleGroup: .legs) }
         #expect(other.name == "Squat")
     }
 
@@ -65,8 +66,36 @@ struct ExerciseLibraryTests {
         let lib = ExerciseLibrary(context: tc.context)
         let e = try lib.add(name: "Bench Press", muscleGroup: .chest)
         #expect(lib.validate(name: "bench press", excluding: e) == nil)
-        try lib.rename(e, to: "bench press")
+        try lib.update(e, name: "bench press", muscleGroup: .chest)
         #expect(e.name == "bench press")
+    }
+
+    @Test func updateChangesNameAndGroupTogether() throws {
+        let tc = try TestContainer()
+        let lib = ExerciseLibrary(context: tc.context)
+        let e = try lib.add(name: "Fly", muscleGroup: .chest)
+        try lib.update(e, name: "  Cable Fly ", muscleGroup: .shoulders)
+        #expect(e.name == "Cable Fly" && e.muscleGroup == .shoulders)
+    }
+
+    @Test func updateOnlyCaseChangeAndOnlyGroup() throws {
+        let tc = try TestContainer()
+        let lib = ExerciseLibrary(context: tc.context)
+        let e = try lib.add(name: "Bench Press", muscleGroup: .chest)
+        try lib.update(e, name: "bench press", muscleGroup: .chest)
+        #expect(e.name == "bench press")
+        try lib.update(e, name: "bench press", muscleGroup: .triceps)
+        #expect(e.name == "bench press" && e.muscleGroup == .triceps)
+    }
+
+    @Test func updateDuplicateThrowsAndChangesNothing() throws {
+        let tc = try TestContainer()
+        let lib = ExerciseLibrary(context: tc.context)
+        try lib.add(name: "Bench Press", muscleGroup: .chest)
+        let other = try lib.add(name: "Squat", muscleGroup: .legs)
+        #expect(throws: ExerciseNameError.duplicate) { try lib.update(other, name: "BENCH press", muscleGroup: .core) }
+        #expect(throws: ExerciseNameError.empty) { try lib.update(other, name: "  ", muscleGroup: .core) }
+        #expect(other.name == "Squat" && other.muscleGroup == .legs)
     }
 
     @Test func archiveHidesFromActiveFetchButIDLookupFinds() throws {

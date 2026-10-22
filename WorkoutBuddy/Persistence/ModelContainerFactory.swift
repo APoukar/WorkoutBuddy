@@ -23,7 +23,7 @@ enum ModelContainerFactory {
             return try ModelContainer(for: schema, configurations: [configuration])
         } catch {
             #if targetEnvironment(simulator)
-            print("ModelContainer failed to load (\(error)). Resetting the store and retrying once.")
+            ErrorLogging.log(error, action: "Store load (resetting simulator store)", category: "launch")
             deleteStoreFiles(at: configuration.url)
             return try ModelContainer(for: schema, configurations: [configuration])
             #else

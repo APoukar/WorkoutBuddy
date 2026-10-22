@@ -1,4 +1,3 @@
-import OSLog
 import SwiftData
 import SwiftUI
 
@@ -30,9 +29,7 @@ struct WorkoutBuddyApp: App {
             try ExerciseSeed.seedIfNeeded(in: container.mainContext)
         } catch {
             container.mainContext.rollback()
-            let ns = error as NSError
-            Logger(subsystem: "net.poukar.WorkoutBuddy", category: "launch")
-                .error("Exercise seed failed (\(ns.domain, privacy: .public) \(ns.code, privacy: .public)), will retry next launch: \(error)")
+            ErrorLogging.log(error, action: "Exercise seed (will retry next launch)", category: "launch")
         }
     }
 }
