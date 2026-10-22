@@ -13,7 +13,7 @@ struct RootTabView: View {
                 placeholder("Progress", systemImage: "chart.line.uptrend.xyaxis")
             }
             Tab("Settings", systemImage: "gearshape") {
-                placeholder("Settings", systemImage: "gearshape")
+                SettingsView()
             }
         }
     }
