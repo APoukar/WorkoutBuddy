@@ -70,6 +70,7 @@ Both folders are synchronized, so new files join their targets automatically.
   - Rest uses `Duration.seconds(n).formatted(.time(pattern: .minuteSecond))`.
   - Durations also get a spoken label for VoiceOver (e.g. "1 minute 30 seconds").
 - **Saving:** every `ExerciseLibrary` change calls `context.save()` explicitly.
+- **Logging errors** (applies to all phases): use `Logger`. Log an error's domain and code as `privacy: .public`, and keep the full error description private (the default), because SwiftData errors can contain record values.
 - **Names are only trimmed at the ends.** Spaces inside a name are kept as typed (agreed in the step 3 review).
 
 ## Steps
@@ -178,8 +179,8 @@ Both folders are synchronized, so new files join their targets automatically.
 
 **Step 5 — App shell**
 - `App/WorkoutBuddyApp.swift`: build the container with the factory (in memory when running as the test host), run `ExerciseSeed.seedIfNeeded` at launch, and attach the container with `.modelContainer`.
-- `App/RootTabView.swift`: a `TabView` using the iOS 18 `Tab` API, with tabs Workouts, History, Progress and Settings and an SF Symbol for each. All four tabs show a `ContentUnavailableView` placeholder for now. Step 6 replaces the Settings one.
-- Delete `ContentView.swift`. Replace the placeholder test with a smoke test that builds the container in memory and seeds it.
+- `App/RootTabView.swift`: a `TabView` using the iOS 18 `Tab` API, with tabs Workouts (`dumbbell`), History (`calendar`), Progress (`chart.line.uptrend.xyaxis`) and Settings (`gearshape`). All four tabs show a `ContentUnavailableView` placeholder for now. Step 6 replaces the Settings one.
+- Delete `ContentView.swift`. Replace the placeholder test with tests of the app's real launch seeding helper: on a fresh in-memory container it gives 43 exercises, and running it again still gives 43. Also test that the test host is detected. If seeding fails at launch, the app rolls back, logs the error (see "Logging errors") and keeps running, and seeding is retried on the next launch.
 
 **Step 6 — Settings → Exercises management (F1)**
 - `Features/Exercises/ExerciseListView.swift`:

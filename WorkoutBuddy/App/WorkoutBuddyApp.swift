@@ -1,0 +1,38 @@
+import OSLog
+import SwiftData
+import SwiftUI
+
+@main
+struct WorkoutBuddyApp: App {
+    private let container: ModelContainer
+
+    init() {
+        do {
+            // Tests never touch the real store.
+            container = try ModelContainerFactory.make(inMemory: ModelContainerFactory.isRunningTests)
+        } catch {
+            fatalError("WorkoutBuddy could not create its data store: \(error)")
+        }
+        Self.seed(container)
+    }
+
+    var body: some Scene {
+        WindowGroup {
+            RootTabView()
+        }
+        .modelContainer(container)
+    }
+
+    /// A failed seed is not fatal: the store opened fine, so history is safe. The failed insert is
+    /// rolled back and the seed runs again on the next launch, because it only runs on an empty store.
+    static func seed(_ container: ModelContainer) {
+        do {
+            try ExerciseSeed.seedIfNeeded(in: container.mainContext)
+        } catch {
+            container.mainContext.rollback()
+            let ns = error as NSError
+            Logger(subsystem: "net.poukar.WorkoutBuddy", category: "launch")
+                .error("Exercise seed failed (\(ns.domain, privacy: .public) \(ns.code, privacy: .public)), will retry next launch: \(error)")
+        }
+    }
+}
