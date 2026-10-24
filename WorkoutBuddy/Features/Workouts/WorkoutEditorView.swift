@@ -134,7 +134,7 @@ struct WorkoutEditorView: View {
 
             pushRow(.picker) {
                 Label {
-                    Text("Add Exercise").foregroundStyle(.primary)
+                    Text("Add Exercise").foregroundStyle(Color.primary)
                 } icon: {
                     Image(systemName: "plus.circle.fill")
                 }
@@ -160,6 +160,7 @@ struct WorkoutEditorView: View {
     /// A row that looks and reads like a `NavigationLink` but pushes through `push`, which clears the name field's
     /// focus first. A `NavigationLink` can't do that: iOS gives the field focus back on pop if it had it at the push.
     /// With `inertWhileEditing`, the row doesn't navigate and hides its chevron in Edit mode, like a link.
+    /// The chevron and the row texts use solid `Color` values: hierarchical styles inside a form button take the tint.
     private func pushRow<Content: View>(
         _ route: WorkoutEditorRoute,
         inertWhileEditing: Bool = false,
@@ -177,21 +178,22 @@ struct WorkoutEditorView: View {
                 if !isInert {
                     Image(systemName: "chevron.right")
                         .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Color(uiColor: .tertiaryLabel))
                         .accessibilityHidden(true)
                 }
             }
-            .foregroundStyle(.primary)
             .contentShape(Rectangle())
         }
     }
 
     private func exerciseRowLabel(_ row: DraftExercise, name: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
+            // Solid colours: the hierarchical styles would derive from the button's accent tint.
             Text(name)
+                .foregroundStyle(Color.primary)
             Text(SetSummary.summary(of: row.sets.map(\.values)))
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.secondary)
         }
     }
 
