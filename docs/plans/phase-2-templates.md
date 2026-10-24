@@ -268,3 +268,28 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
   - VoiceOver reads the list rows, set rows, the "Added" label and the summaries sensibly.
   - With VoiceOver and a Czech region, a 22.5 kg set is read sensibly ("22,5 kilograms"). If it isn't, revisit the spoken number format (step 3 review).
   - Largest accessibility text size: the editor, the sets screen and the detail still lay out without clipping.
+- **Part B manual check status** (2026-10-25). The full test suite passed on iOS 18.2 once more (221 tests). The manual check was started on iPhone 17 / iOS 27 by driving the simulator remotely; simulated taps there are unreliable (each tap arrives only with the next input, switches ignore taps, menus close early), so the rest is checked by hand before the PR is merged.
+  - **Checked on iOS 27:**
+    - The empty Workouts tab shows "No Workouts", "Create a workout to plan your sets." and a "New Workout" button.
+    - The New Workout sheet opens with the name field focused, Save disabled and the "Add at least one exercise." footer.
+    - The picker marks picks as "Added" and stays open; the Shoulders filter works and shows the filled icon; the search field sits at the bottom and doesn't overlap the filter button. The filled icon is a black disc inside the button's round background; it looks acceptable, so it stays.
+    - Going back from the picker doesn't reopen the keyboard.
+    - First sets: an exercise without defaults gets the Settings values (10 × 22,5 kg, 1:30); Bench Press with its own 12-rep and 1:30 defaults gets 12 reps and 1:30 with 22,5 kg from Settings.
+    - The sets screen shows the exercise name, "Set 1" without "Delete Set"; "Add Set" copies the set and both sets then show "Delete Set".
+    - Found and fixed: the editor's exercise rows and "Add Exercise" were drawn in the accent colour after the step 8 change (commit 8b867eb). The fix was checked on iOS 27 and 18.2 by the code-reviewer with screenshots; the final "Add Exercise" look (label-colour title, blue icon, grey chevron) still needs a look on screen.
+  - **Still to check by hand**, on iOS 27 unless noted, and everything on iOS 18.2:
+    - The final look of "Add Exercise" and the exercise rows in the editor.
+    - Mixed first-set sources: after saving "Push" with a changed Bench Press weight, adding Bench Press to a new template takes reps and rest from its own defaults and kg from "Push".
+    - Deleting a set, and that the last set can't be deleted.
+    - Reorder with Edit/Done and swipe-to-delete, save, reopen; VoiceOver "Move Up" / "Move Down"; "Add Exercise" and "Delete Workout" in Edit mode; the Edit button doesn't flicker to "Done" during a swipe.
+    - Duplicate name "push" rejected; "Push" allowed again after deleting it.
+    - "Discard Changes?" from Cancel; swipe-down blocked with changes; Save without changes just closes.
+    - Going back from the sets screen doesn't reopen the keyboard.
+    - A template emptied in Settings → Exercises: list warning, detail empty state, Start Workout disabled, editor can't save.
+    - Deleting from the editor returns to the list once.
+    - "Bodyweight" for a 0 kg set in the editor summary and the detail.
+    - kg fields with a Czech and a US region, the Done checkmark, and the last kg field above the keyboard (on iOS 18.2 with ⌘K).
+    - The Start Workout bar (soft edge on iOS 27, `.bar` background on iOS 18.2), and the orange warning in light and dark mode.
+    - VoiceOver for list rows, set rows, "Added", the pick announcement, the summaries and a 22,5 kg set with a Czech region.
+    - Largest accessibility text size for the editor, the picker's "Added" label, the sets screen and the detail.
+  - **Follow-up outside phase 2:** in Settings, "Weight" shows "22,5 kg" with a Czech region but "Weight Step" shows "2.5 kg" with a dot (phase 1 screen).
