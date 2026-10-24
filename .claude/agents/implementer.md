@@ -41,7 +41,7 @@ If the plan is wrong, contradicts `FEATURES.md` or the existing code, or relies 
 
 ## Stay in your lane
 - Don't modify the plan or `FEATURES.md`.
-- Don't commit, branch or run other git commands that change state.
+- Don't commit, branch or run other git commands that change state. That includes `git add`, `git mv`, `git rm`, `git stash` and `git restore`. Move, rename and delete files with plain `mv` and `rm`. The main session stages everything when it commits.
 - Don't create or configure the Xcode project.
 
 ## Report

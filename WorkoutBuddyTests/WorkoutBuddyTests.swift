@@ -1,9 +1,17 @@
+import SwiftData
 import Testing
 @testable import WorkoutBuddy
 
 struct WorkoutBuddyTests {
-    // Placeholder so the test target builds and runs; replace with real tests in phase 1.
-    @Test func appModuleLoads() {
-        _ = ContentView()
+    @Test func launchSeedingIsIdempotent() throws {
+        let test = try TestContainer()
+        WorkoutBuddyApp.seed(test.container)
+        #expect(try test.context.fetchCount(FetchDescriptor<Exercise>()) == 43)
+        WorkoutBuddyApp.seed(test.container)
+        #expect(try test.context.fetchCount(FetchDescriptor<Exercise>()) == 43)
+    }
+
+    @Test func testHostIsDetected() {
+        #expect(ModelContainerFactory.isRunningTests)
     }
 }
