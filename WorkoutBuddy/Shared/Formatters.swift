@@ -7,6 +7,17 @@ nonisolated enum Formatters {
         value.formatted(.number.precision(.fractionLength(0...1)).locale(locale))
     }
 
+    /// "22.5 kg" (with a non-breaking space, so "kg" never wraps alone), or "Bodyweight" for 0 kg. Use this wherever a weight is shown as text.
+    static func weight(_ kg: Double, locale: Locale = .current) -> String {
+        kg == 0 ? "Bodyweight" : "\(Formatters.kg(kg, locale: locale))\u{00A0}kg"
+    }
+
+    /// Spoken form for VoiceOver: "22.5 kilograms", "1 kilogram", or "bodyweight" for 0 kg.
+    static func spokenWeight(_ kg: Double, locale: Locale = .current) -> String {
+        if kg == 0 { return "bodyweight" }
+        return "\(Formatters.kg(kg, locale: locale)) \(kg == 1 ? "kilogram" : "kilograms")"
+    }
+
     /// "1:30" (minutes:seconds).
     static func rest(seconds: Int, locale: Locale = .current) -> String {
         Duration.seconds(max(seconds, 0)).formatted(.time(pattern: .minuteSecond).locale(locale))

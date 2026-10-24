@@ -110,7 +110,7 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
     - `removeSet(_ setID:, fromExercise id:)`. It does nothing when it would remove the exercise's last set: an exercise always keeps at least one set, and removing the exercise is the way to get rid of it.
     - `sets(ofExercise id:) -> [DraftSet]`, `values(ofSet:inExercise:) -> SetValues?` and `setValues(_:ofSet:inExercise:)`: the sets screen builds its bindings from these, by ID, never by array index.
     - `issues: [DraftIssue]`: `.emptyName`, `.noExercises` and `.exerciseWithoutSets`, in that order. The editor saves only when it's empty. Name uniqueness needs the store, so `WorkoutLibrary` checks it.
-- `Shared/Formatters.swift`: add `weight(_ kg:)` → "22.5 kg", or "Bodyweight" for 0, and its spoken form ("22.5 kilograms" / "bodyweight").
+- `Shared/Formatters.swift`: add `weight(_ kg:)` → "22.5 kg", or "Bodyweight" for 0, and its spoken form ("22.5 kilograms" / "bodyweight"). The number and "kg" are joined by a non-breaking space (U+00A0), also in ranges ("60–80 kg"), so "kg" never wraps onto its own line (step 3 review). Spoken numbers follow the region like the screen does ("22,5 kilograms" in a Czech region); the locale-specific tests use `en_CZ`, the locale an English-only app actually runs with in a Czech region.
 - `Features/Workouts/SetSummary.swift` (`nonisolated`): text for sets, using `Formatters`:
   - one set's line for detail rows: "10 × 60 kg", "10 × Bodyweight", with the spoken "10 reps at 60 kilograms" / "10 reps, bodyweight"
   - a one-line summary of an exercise's sets for list rows:
@@ -125,7 +125,7 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
   - `removeSet` keeps the last set
   - the ID-based set helpers, including unknown IDs (no change, `nil`)
   - each issue, and an empty list for a valid draft
-  - `Formatters.weight` for 0 and non-zero, in fixed `en_US` and `cs_CZ` locales
+  - `Formatters.weight` for 0 and non-zero, in fixed `en_US` and `en_CZ` locales
   - every summary case, including Bodyweight, ranges with 0, and the singular forms, in both visual and spoken forms
 
 **Step 4 — Shared name rule, and `WorkoutLibrary`: validation, save and soft delete**
@@ -260,4 +260,5 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
   - kg fields in the sets screen: type 22,5 with a Czech region and with a US region; every kg field has its Done bar (the screen lives in a sheet, where SwiftUI's keyboard toolbar used to fail); the kg field of the last set isn't hidden by the keyboard.
   - The list scrolls under the Start Workout bar without rows showing through.
   - VoiceOver reads the list rows, set rows, the "Added" label and the summaries sensibly.
+  - With VoiceOver and a Czech region, a 22.5 kg set is read sensibly ("22,5 kilograms"). If it isn't, revisit the spoken number format (step 3 review).
   - Largest accessibility text size: the editor, the sets screen and the detail still lay out without clipping.
