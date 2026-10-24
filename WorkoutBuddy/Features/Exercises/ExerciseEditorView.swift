@@ -46,7 +46,7 @@ struct ExerciseEditorView: View {
     var body: some View {
         // Computed once per redraw.
         let nameError = library.validate(name: name, excluding: exercise)
-        let shownError = ExerciseMessages.visibleNameError(nameError, hasEdited: hasEdited)
+        let shownError = NameRules.visibleError(nameError, hasEdited: hasEdited)
         NavigationStack {
             Form {
                 Section {

@@ -138,7 +138,7 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
   - `validate(name:excluding:) -> NameError?` against active templates, using `NameRules.check`. It has a throwing private version that `save` uses.
   - `draft(for workout: Workout?) -> WorkoutDraft`: an empty draft for a new template, or the template's exercises and sets in order, with their row IDs. Rows whose `exercise` is `nil` are skipped.
   - `save(_ draft:, to workout: Workout?, now: Date = .now) throws -> Workout`. Everything that can fail is checked **before the first change** to the context:
-    1. Check the name with the throwing validation. Throw `WorkoutSaveError.invalid` if `draft.issues` isn't empty.
+    1. Check the name with the throwing validation. Throw `WorkoutSaveError.invalid` if `draft.issues` isn't empty, or if the draft repeats an exercise, a row ID, or a set ID within a row. The editor can't produce repeats, but a draft built in code could, and they would break the "each exercise once" rule or leave stale rows behind (step 4 review). No `DraftIssue` is added for this.
     2. Look up every `exerciseID` with `ExerciseLibrary.exercise(id:)`. A missing **or archived** exercise throws `WorkoutSaveError.missingExercise`: a template must never get a deleted exercise back.
     3. Only then change the context: insert a new `Workout(name:, createdAt: now)` when `workout` is `nil`; set the trimmed name and `updatedAt = now`.
     4. Reconcile the rows by ID: update the order, the exercise and the set values of matching rows; insert new rows with the draft's IDs and link them by their to-one; set every `order` from the draft's position; only **then** delete the rows and sets the draft no longer has (`context.delete`).
@@ -150,7 +150,8 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
   - creating a template from a draft with a fixed `now`: name, order of exercises and sets, values, `createdAt == updatedAt == now`
   - editing: unchanged rows keep their IDs; reorder, insert and remove all land correctly; removed rows and their sets are gone from the store after save (fetch them, not just the accessor); `updatedAt` becomes the new `now`
   - duplicate and empty names are rejected; a soft-deleted template's name can be reused; renaming a template to its own name in another case is allowed
-  - an invalid draft, a missing exercise and an archived exercise each throw and leave the context with no changes (`context.hasChanges` is false, and the template is unchanged)
+  - an invalid draft, a draft with a repeated exercise, row ID or set ID, a missing exercise and an archived exercise each throw and leave the context with no changes (`context.hasChanges` is false, and the template is unchanged)
+  - the edit test also reads the result back through a fresh `ModelContext(tc.container)`: row IDs, orders, exercises and set orders
   - out-of-range values are stored clamped
   - editing a template leaves past sessions alone: build a session with `SessionSet`s from the template, then change values and remove an exercise in the template; the session's planned values and its `SessionExercise.exercise` are unchanged
   - soft delete hides the template from active fetches, `workout(id:)` still finds it, and its sessions keep their workout reference

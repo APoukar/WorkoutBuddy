@@ -36,7 +36,7 @@ struct ExerciseLibraryTests {
         let lib = ExerciseLibrary(context: tc.context)
         #expect(lib.validate(name: "") == .empty)
         #expect(lib.validate(name: "  \n ") == .empty)
-        #expect(throws: ExerciseNameError.empty) { try lib.add(name: " ", muscleGroup: .core) }
+        #expect(throws: NameError.empty) { try lib.add(name: " ", muscleGroup: .core) }
     }
 
     @Test func duplicatesDifferingInCaseRejected() throws {
@@ -45,9 +45,9 @@ struct ExerciseLibraryTests {
         try lib.add(name: "Bench Press", muscleGroup: .chest)
         #expect(lib.validate(name: "bench press") == .duplicate)
         #expect(lib.validate(name: " BENCH PRESS ") == .duplicate)
-        #expect(throws: ExerciseNameError.duplicate) { try lib.add(name: "bench PRESS", muscleGroup: .chest) }
+        #expect(throws: NameError.duplicate) { try lib.add(name: "bench PRESS", muscleGroup: .chest) }
         let other = try lib.add(name: "Squat", muscleGroup: .legs)
-        #expect(throws: ExerciseNameError.duplicate) { try lib.update(other, name: "bench press", muscleGroup: .legs, defaults: .none) }
+        #expect(throws: NameError.duplicate) { try lib.update(other, name: "bench press", muscleGroup: .legs, defaults: .none) }
         #expect(other.name == "Squat")
     }
 
@@ -93,8 +93,8 @@ struct ExerciseLibraryTests {
         let lib = ExerciseLibrary(context: tc.context)
         try lib.add(name: "Bench Press", muscleGroup: .chest)
         let other = try lib.add(name: "Squat", muscleGroup: .legs)
-        #expect(throws: ExerciseNameError.duplicate) { try lib.update(other, name: "BENCH press", muscleGroup: .core, defaults: .none) }
-        #expect(throws: ExerciseNameError.empty) { try lib.update(other, name: "  ", muscleGroup: .core, defaults: .none) }
+        #expect(throws: NameError.duplicate) { try lib.update(other, name: "BENCH press", muscleGroup: .core, defaults: .none) }
+        #expect(throws: NameError.empty) { try lib.update(other, name: "  ", muscleGroup: .core, defaults: .none) }
         #expect(other.name == "Squat" && other.muscleGroup == .legs)
     }
 
@@ -137,7 +137,7 @@ struct ExerciseLibraryTests {
         try lib.add(name: "Bench Press", muscleGroup: .chest)
         let original = ExerciseDefaults(reps: 8, kg: 60, restSeconds: 120)
         let other = try lib.add(name: "Squat", muscleGroup: .legs, defaults: original)
-        #expect(throws: ExerciseNameError.duplicate) {
+        #expect(throws: NameError.duplicate) {
             try lib.update(
                 other, name: "bench press", muscleGroup: .core,
                 defaults: ExerciseDefaults(reps: 3, kg: 100, restSeconds: 30))
