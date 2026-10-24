@@ -142,12 +142,13 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
 - `save(_:)`: on a finished session with a done set, calls `finalize`; refuses (no-op) without a done set.
 - `endAndSave(_:)` for recovery: ends early at `lastActivity` (clearing `pausedAt` and the rest) and calls `finalize`, committed in one `save()`.
 - private `finalize(_:)`: sets the status from `SessionStats.endedEarly`. Phase 6 adds PR detection here.
-- `Features/Session/LaunchRecovery.swift` (`nonisolated`): `decide(snapshot) -> .none / .askResume(canSave: Bool) / .showSummary`.
+- `Features/Session/LaunchRecovery.swift` (`nonisolated`): `decide(snapshot) -> .none / .askResume(canSave: Bool) / .showSummary`. A session with no pending set but no `endedAt` (only bad data can produce it) counts as `.showSummary`, and `save` first sets its `endedAt` to `lastActivity`, so the user is never stuck (step 1 review).
 - Tests:
   - pause freezes elapsed and rest remaining; resume adds to `pausedDuration` and shifts `restEndsAt`; pause after the rest expired and resume later doesn't bring the rest back
   - end early while paused: not paused afterwards (`pausedAt == nil`, `isPaused` false), and the duration equals the active time only (the pause isn't subtracted twice)
   - end early: not-performed marking, actual values of an undone set cleared, duration excludes pauses; refused with no done set (also when sets were skipped)
   - save refuses a finished session where every set was skipped
+  - a session with every set resolved but no `endedAt`: recovery shows the summary, and save sets `endedAt = lastActivity` and finalizes
   - discard removes the session and its children from the store (fetch them)
   - save: completed vs ended early; the session then counts for `WorkoutLibrary.lastPerformed` and is no longer active
   - end and save: `endedAt` = last activity in each case, status `endedEarly`
@@ -178,7 +179,7 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
 - `Features/Session/RestAlertRules.swift` (pure): `shouldPlayAlert(restEndsAt:noticedAt:)` with the 2-second window; tests.
 - `Features/Session/RestAlert.swift`: plays the haptic and the bundled `RestEnd.caf` (already in `WorkoutBuddy/Resources/`, added by the main session) according to `AppSettings.current()`. The sound ID is created once and reused; a missing file is logged, not fatal.
 - `Features/Session/SessionSummaryView.swift` (values only, no models): title, workout name, duration, the counts, volume, and **Save** (prominent) in `.bottomActionBar`. Without a done set: the note and **Discard Workout** (destructive, with confirmation) instead of Save. A comment marks where phase 6 adds "New Records".
-- `Features/Session/ActiveSessionView.swift`: takes the session **ID**, reads the session with its own `@Query(filter: #Predicate { $0.id == sessionID })`, builds the snapshot in `body` (renders `Color.clear` when the row is gone), and shows the set screen, rest screen or summary from `screen(now:)`, with the paused overlay on top when paused. It wires every callback to `SessionLibrary`, shows `.errorAlert` on failure, runs the rest auto-advance task (calls `finishRest`, then `RestAlert` if `shouldPlayAlert`), re-reads on scene-phase changes, shows the end/discard confirmation from the pause overlay (`confirmationDialog` anchored to the End Workout button), and keeps the screen awake while it's on screen. Screen changes use a short cross-fade (none with Reduce Motion).
+- `Features/Session/ActiveSessionView.swift`: takes the session **ID**, reads the session with its own `@Query(filter: #Predicate { $0.id == sessionID })`, builds the snapshot in `body` (renders `Color.clear` when the row is gone), and shows the set screen, rest screen or summary from `screen(now:)`, with the paused overlay on top when paused. It wires every callback to `SessionLibrary`, shows `.errorAlert` on failure, runs the rest auto-advance task (calls `finishRest`, then `RestAlert` if `shouldPlayAlert`), re-reads on scene-phase changes, shows the end/discard confirmation from the pause overlay (`confirmationDialog` anchored to the End Workout button), and keeps the screen awake while it's on screen. Screen changes use a short cross-fade (none with Reduce Motion). Transitions, `.id`s and tasks are keyed on a stable screen key (`.set(setID)`, `.rest(setID)`, `.summary`), never on `SessionScreen` itself, whose rest case carries the remaining seconds and changes every second; the auto-advance task is keyed on `restEndsAt` (step 1 review).
 - Previews from `SessionPreviewData` (this step creates it): first set, resting, paused, finished, ended early.
 - Run the Release build too.
 
@@ -236,3 +237,8 @@ The user was asleep, so the main session settled these. Each can be revisited.
 13. The VoiceOver design of the large controls contradicted itself → **accepted**: one adjustable element plus an "Edit Value" action.
 14. Test gaps and the `Set` name → **accepted**: undo → skip test, `SessionSnapshot.Entry`, recovery message fallback.
 15. Undocumented system sound IDs → **accepted**: the main session synthesized `WorkoutBuddy/Resources/RestEnd.caf` (two-tone chime, 0.95 s, 16-bit PCM) for phase 3 and phase 4.
+
+**Step 1 code review, verdict "Approve", 3 minor findings:**
+1. All sets resolved but no `endedAt` (bad data only) would leave Resume → a summary whose Save does nothing → **accepted** into step 4: recovery shows the summary and `save` sets `endedAt = lastActivity`.
+2. `SessionScreen.rest` changes every second → **accepted** into step 7: key transitions and tasks on a stable screen key and `restEndsAt`.
+3. `FEATURES.md` §4 didn't list the new fields → **updated** §4 with `pausedAt`, `restEndsAt` and the "resolved at" meaning of `completedAt` (wording only, no behaviour change).

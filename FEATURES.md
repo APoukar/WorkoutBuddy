@@ -98,7 +98,7 @@ A personal iPhone app for planning gym workouts, running them set by set with gu
 ## 4. Conceptual data model
 - **Exercise**: id, name, muscleGroup, isCustom, isArchived, optional defaultReps / defaultKg / defaultRestSeconds
 - **Workout** (template): id, name, createdAt, updatedAt (last saved in the editor; used for "values last used in a template"), isSoftDeleted (named so because SwiftData models already have an `isDeleted` property), sessions (inverse of the session's workout ref) → ordered **WorkoutExercise** (exercise ref) → ordered **PlannedSet** (reps, kg, restSeconds)
-- **WorkoutSession**: id, workout ref, startedAt, endedAt, pausedDuration, status (inProgress / completed / endedEarly) → ordered **SessionExercise** (exercise ref) → ordered **SessionSet** (planned reps/kg/rest, actual reps/kg, status pending / done / skipped / notPerformed, completedAt)
+- **WorkoutSession**: id, workout ref, startedAt, endedAt, pausedDuration, pausedAt and restEndsAt (only set while a session runs), status (inProgress / completed / endedEarly) → ordered **SessionExercise** (exercise ref) → ordered **SessionSet** (planned reps/kg/rest, actual reps/kg, status pending / done / skipped / notPerformed, completedAt = when it was done or skipped)
 - Rules:
   - Sessions **copy the planned numbers**, because templates can change later.
   - Names are **not** copied. They're looked up through references, and workouts and exercises are soft-deleted so those references keep working.
