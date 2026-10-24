@@ -19,7 +19,7 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
 **Session hand-off after step 5:** do the part A manual check (see "Verification"), then update the phase 2 progress memory with the last commit, any decisions made outside this plan, and "part B starts at step 6". Part B starts in a fresh session from that memory, this plan and `git log`.
 
 ## Decisions
-- **"Values last used in a template" (§6):** the first set of that exercise in the active template that was **saved most recently**. "Saved" means created or edited through the template editor. This needs a new `Workout.updatedAt`. Soft-deleted templates are ignored. A template whose row for that exercise has no sets is skipped. Ties are broken by `createdAt`, then `id`, so the result is deterministic.
+- **"Values last used in a template" (§6):** the first set of that exercise in the active template that was **saved most recently**. "Saved" means created or edited through the template editor. Tapping Save without any change closes the editor without writing, so it doesn't make the template "last used" (step 7 review). This needs a new `Workout.updatedAt`. Soft-deleted templates are ignored. A template whose row for that exercise has no sets is skipped. Ties are broken by `createdAt`, then `id`, so the result is deterministic.
 - **The first-set rule is resolved per value:** reps, kg and rest each come from the exercise's own default if set, then from the last-used set, then from Settings. A template's unsaved edits never count as "last used".
 - **An exercise can appear only once in a template.** The picker shows exercises already in the template as disabled, with an "Added" label. This keeps "Exercise 2 of 5", per-session progress points and the last-used rule unambiguous. Supersets and warm-up sets are out of scope (§5).
 - **Template names are unique** among active (not soft-deleted) templates, compared case-insensitively and trimmed at the ends, the same as exercise names. A soft-deleted template's name can be reused. Both libraries use one shared name rule.
@@ -183,18 +183,19 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
 - Tests: the `WorkoutMessages` texts and `failureMessage(for:)`.
 
 **Step 7 — Template editor**
-- `Features/Workouts/WorkoutEditorView.swift`: one sheet for both creating and editing, with its own `NavigationStack(path:)`. The path holds a small `Hashable` route enum (`.sets(exerciseID: UUID)`, `.picker`); steps 8 and 9 add the destinations.
+- `Features/Workouts/WorkoutEditorView.swift`: one sheet for both creating and editing, with its own `NavigationStack(path:)`. The path holds a small `Hashable` route enum, `WorkoutEditorRoute` in `WorkoutEditorRules.swift` (`.sets(draftExerciseID: UUID)`, carrying the `DraftExercise.id`, and `.picker`); steps 8 and 9 replace the placeholder destinations (step 7 review).
   - Holds the draft in `@State`, built once from `WorkoutLibrary.draft(for:)`, and keeps the starting draft to detect changes.
   - **Name** section: a text field, focused when creating, with the inline name error (`NameRules.visibleError`) and the VoiceOver announcement, as in the exercise editor.
   - **Exercises** section, with an **Edit/Done** button in its header that switches `editMode` for the list:
     - One row per draft exercise, keyed by draft exercise ID, showing the exercise name and its `SetSummary`.
     - In edit mode, rows show delete and reorder controls (`onDelete`, `onMove`). Outside edit mode, rows open the sets screen (step 9) and still support swipe-to-delete.
-    - Each row has VoiceOver actions "Move Up" and "Move Down" (`draft.moveExercise(id:by:)`).
+    - Each row has VoiceOver actions "Move Up" and "Move Down" (`draft.moveExercise(id:by:)`), offered only when the move is possible (no "Move Up" on the first row, no "Move Down" on the last).
     - An "Add Exercise" row comes last; step 8 makes it open the picker.
     - When the draft has `.noExercises`, the section footer says "Add at least one exercise."
   - The editor shows only these two messages: the inline name error under the name field, and the "Add at least one exercise." footer. `.emptyName` isn't shown a second time anywhere, and `.exerciseWithoutSets` can't happen through the UI, so neither gets its own text on screen (step 6 review).
-  - Toolbar: Cancel, and Save, which is disabled while the name is invalid or the draft has issues. Save calls `WorkoutLibrary.save` and dismisses.
-  - Cancel with changes shows a "Discard Changes?" confirmation dialog. Swipe-to-dismiss is disabled while there are changes (`.interactiveDismissDisabled`); see the Decisions for why there's no prompt.
+  - Toolbar: Cancel, and Save, which is disabled while the name is invalid or the draft has issues. Save calls `WorkoutLibrary.save` and dismisses. With no changes, Save only dismisses, without writing (step 7 review).
+  - The name field is focused only the first time the editor appears when creating, not again after returning from the picker or the sets screen (step 7 review).
+  - Cancel with changes shows a "Discard Changes?" confirmation dialog, attached to the Cancel button. Swipe-to-dismiss is disabled while there are changes (`.interactiveDismissDisabled`); see the Decisions for why there's no prompt.
   - When editing, a destructive **Delete Workout** button at the bottom uses `.workoutDeletionAlert`. After the deletion it calls an `onDeleted` callback and dismisses; the caller decides what to pop (step 10).
   - Errors use `.errorAlert`.
 - Previews: new template, editing "Push Day", editing "Empty".
@@ -211,7 +212,7 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
 - Previews: the picker with nothing added, and with Bench Press already added.
 
 **Step 9 — Sets screen**
-- `Features/Workouts/ExerciseSetsView.swift`: the `.sets(exerciseID:)` destination. It takes `@Binding var draft: WorkoutDraft` and the draft exercise ID, and builds every binding through the draft's ID-based helpers (step 3). If the exercise is no longer in the draft, it shows nothing and doesn't crash.
+- `Features/Workouts/ExerciseSetsView.swift`: the `.sets(draftExerciseID:)` destination. It takes `@Binding var draft: WorkoutDraft` and the draft exercise ID, and builds every binding through the draft's ID-based helpers (step 3). If the exercise is no longer in the draft, it shows nothing and doesn't crash.
   - Title: the exercise name.
   - One section per set, `ForEach` keyed by **set ID** (`WeightField` keeps its text in `@State`, so index keys would show stale text after a delete), headed "Set 1", "Set 2", …, with `RepsStepper`, `WeightField` and `RestStepper`.
   - Each section ends with a destructive "Delete Set" button, hidden when it's the only set.
@@ -255,7 +256,9 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
   - Reorder with Edit/Done and remove exercises, save, reopen: the order and the sets are kept. With VoiceOver, "Move Up" and "Move Down" reorder too.
   - Create "push": it's rejected as a duplicate. Delete "Push", then create "Push": it's allowed.
   - The picker shows exercises already in the template as "Added", stays open after each pick, and the muscle-group filter and search work together.
-  - Cancel after an edit asks "Discard Changes?". Swiping the sheet down is blocked while there are changes.
+  - Cancel after an edit asks "Discard Changes?", shown from the Cancel button on iOS 27. Swiping the sheet down is blocked while there are changes. Save without changes just closes the editor.
+  - The name field is focused when the New Workout sheet opens. Going back from the picker or the sets screen doesn't reopen the keyboard.
+  - In Edit mode, "Add Exercise" and "Delete Workout" still work. Swiping a row to delete it doesn't briefly switch the header's Edit button to "Done".
   - Delete a template's only exercise in Settings → Exercises: the list and detail show it needs exercises, Start Workout is disabled, and the editor can't save until an exercise is added.
   - Delete a template from its editor: the app returns to the list once, without a double pop.
   - A 0 kg set shows "Bodyweight" in the editor summary and the detail.
