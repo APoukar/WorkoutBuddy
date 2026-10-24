@@ -192,6 +192,7 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
     - Each row has VoiceOver actions "Move Up" and "Move Down" (`draft.moveExercise(id:by:)`).
     - An "Add Exercise" row comes last; step 8 makes it open the picker.
     - When the draft has `.noExercises`, the section footer says "Add at least one exercise."
+  - The editor shows only these two messages: the inline name error under the name field, and the "Add at least one exercise." footer. `.emptyName` isn't shown a second time anywhere, and `.exerciseWithoutSets` can't happen through the UI, so neither gets its own text on screen (step 6 review).
   - Toolbar: Cancel, and Save, which is disabled while the name is invalid or the draft has issues. Save calls `WorkoutLibrary.save` and dismisses.
   - Cancel with changes shows a "Discard Changes?" confirmation dialog. Swipe-to-dismiss is disabled while there are changes (`.interactiveDismissDisabled`); see the Decisions for why there's no prompt.
   - When editing, a destructive **Delete Workout** button at the bottom uses `.workoutDeletionAlert`. After the deletion it calls an `onDeleted` callback and dismisses; the caller decides what to pop (step 10).

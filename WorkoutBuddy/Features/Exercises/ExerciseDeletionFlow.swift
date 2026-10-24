@@ -39,30 +39,11 @@ private struct ExerciseDeletionAlert: ViewModifier {
     }
 }
 
-/// Shows an alert for a failed action.
-private struct ExerciseErrorAlert: ViewModifier {
-    @Binding var error: Error?
-
-    func body(content: Content) -> some View {
-        content.alert(
-            "Something Went Wrong", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(error.map(ExerciseMessages.failureMessage(for:)) ?? "")
-        }
-    }
-}
-
 extension View {
     func exerciseDeletionAlert(
         _ pending: Binding<PendingExerciseDeletion?>, library: ExerciseLibrary,
         onFailure: @escaping (Error) -> Void, onDeleted: @escaping () -> Void = {}
     ) -> some View {
         modifier(ExerciseDeletionAlert(pending: pending, library: library, onFailure: onFailure, onDeleted: onDeleted))
-    }
-
-    func exerciseErrorAlert(_ error: Binding<Error?>) -> some View {
-        modifier(ExerciseErrorAlert(error: error))
     }
 }

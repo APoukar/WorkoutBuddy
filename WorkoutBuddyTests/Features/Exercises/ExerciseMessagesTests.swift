@@ -11,6 +11,6 @@ struct ExerciseMessagesTests {
     @Test func failureMessageUsesNameMessageOrGenericText() {
         #expect(ExerciseMessages.failureMessage(for: NameError.duplicate) == ExerciseMessages.message(for: .duplicate))
         let generic = ExerciseMessages.failureMessage(for: NSError(domain: "X", code: 1))
-        #expect(generic.contains("Please try again"))
+        #expect(generic == "Something went wrong. Please try again.")
     }
 }

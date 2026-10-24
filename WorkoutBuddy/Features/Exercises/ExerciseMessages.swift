@@ -12,6 +12,6 @@ nonisolated enum ExerciseMessages {
     /// Text for the error alert after a failed action.
     static func failureMessage(for error: Error) -> String {
         if let nameError = error as? NameError { return message(for: nameError) }
-        return "Something went wrong. Please try again."
+        return ErrorMessages.generic
     }
 }

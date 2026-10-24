@@ -98,7 +98,7 @@ struct ExerciseEditorView: View {
             .onAppear { if exercise == nil { nameFocused = true } }
             .exerciseDeletionAlert(
                 $pendingDeletion, library: library, onFailure: { failure = $0 }, onDeleted: { dismiss() })
-            .exerciseErrorAlert($failure)
+            .errorAlert($failure, message: ExerciseMessages.failureMessage(for:))
         }
     }
 
