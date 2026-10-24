@@ -1,10 +1,11 @@
+import SwiftData
 import SwiftUI
 
 struct RootTabView: View {
     var body: some View {
         TabView {
             Tab("Workouts", systemImage: "dumbbell") {
-                placeholder("Workouts", systemImage: "dumbbell")
+                WorkoutListView()
             }
             Tab("History", systemImage: "calendar") {
                 placeholder("History", systemImage: "calendar")
@@ -25,4 +26,5 @@ struct RootTabView: View {
 
 #Preview {
     RootTabView()
+        .modelContainer(WorkoutPreviewData.container())
 }

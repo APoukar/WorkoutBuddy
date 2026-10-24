@@ -224,21 +224,21 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
 - `Features/Workouts/WorkoutListView.swift`, in the Workouts tab of `RootTabView`, replacing the placeholder:
   - A `NavigationStack(path:)` whose path is an array of workout IDs, owned by the list. Rows use `NavigationLink(value: workout.id)`, and `navigationDestination` resolves the ID with `WorkoutLibrary.workout(id:)`.
   - The large title "Workouts" and a `@Query` of active templates, sorted by name in memory with `localizedStandardCompare`.
-  - Each row shows the name, then "5 exercises · Last done 12 Oct 2026" or "5 exercises · Not done yet". A template that can't start shows "No exercises" with a warning symbol in orange instead of the count, and VoiceOver reads "Needs exercises". Dates use `formatted(date: .abbreviated, time: .omitted)`.
+  - Each row shows the name, then "5 exercises · Last done 12 Oct 2026" or "5 exercises · Not done yet". A template that can't start shows "No exercises" with an orange warning symbol instead of the count (only the symbol is orange; the text keeps the normal subtitle style, because orange text is too faint on white), and VoiceOver reads "Needs exercises". The last-done part stays ("No exercises · Last done 12 Oct 2026") (step 10 review). Dates use `formatted(date: .abbreviated, time: .omitted)`.
   - A toolbar "+" button (accessibility label "New Workout") opens `WorkoutEditorView` to create a template.
   - Each row has a trailing **Delete** swipe action, red-tinted, without full swipe, using `.workoutDeletionAlert`.
   - With no templates: `ContentUnavailableView` "No Workouts", "Create a workout to plan your sets.", with a "New Workout" button.
 - `Features/Workouts/WorkoutDetailView.swift`:
   - Title: the template name. Toolbar "Edit" opens `WorkoutEditorView` for the template as a sheet.
-  - One section per exercise (name as header). Each set is a row: "Set 1", the `SetSummary` line ("10 × 60 kg" or "10 × Bodyweight"), and the rest ("1:30"), with a combined VoiceOver label.
+  - One section per exercise (name as header). Each set is a row: "Set 1", the `SetSummary` line ("10 × 60 kg" or "10 × Bodyweight"), and the rest ("1:30"), with a combined VoiceOver label. At accessibility text sizes the three parts stack vertically (step 10 review).
   - A template with no exercises shows `ContentUnavailableView` "No Exercises", "Edit this workout to add exercises."
-  - A **Start Workout** button pinned at the bottom with `.safeAreaInset(edge: .bottom)` and a `.bar` background, so rows don't show through it on iOS 18. `.borderedProminent`, `.controlSize(.large)`, full width. It's disabled when `canStart` is false, with "Add an exercise to start this workout." under it. Its action is empty until phase 3. Don't use `safeAreaBar`.
+  - A **Start Workout** button pinned at the bottom with `.safeAreaInset(edge: .bottom)` and a `.bar` background, so rows don't show through it on iOS 18. `.borderedProminent`, `.controlSize(.large)`, full width. It's disabled when `canStart` is false, with "Add an exercise to start this workout." under it. Its action is empty until phase 3. On iOS 26 and later it uses `.safeAreaBar(edge: .bottom)` without the `.bar` background, so the list gets the system's soft scroll-edge effect; `.safeAreaInset` with `.bar` is the iOS 18 fallback (step 10 review).
   - **Deleting from the editor:** the editor's `onDeleted` sets a flag in the detail view. The editor sheet's `onDismiss` checks the flag and asks the list to remove the workout's ID from its path, so the pop happens once, after the sheet is gone.
 - Previews: the list with the preview data, an empty list, the detail of "Push Day", "Core" and "Empty".
 
 ## Hooks left for later phases
-- **Phase 3:** the Start Workout action, the "only one active session" rule, and creating the session from the template, copying the planned numbers (`SetValues` is in `Models/` for this). `WorkoutLibrary.canStart` is the start check. `lastPerformed` starts showing real data once sessions are saved. The set screen shows 0 kg as "Bodyweight" through `Formatters.weight`.
-- **Phase 5:** History reaches templates through `WorkoutSession.workout`, including soft-deleted ones (`workout(id:)` doesn't filter them). Set rows use `Formatters.weight`.
+- **Phase 3:** the Start Workout action, the "only one active session" rule, and creating the session from the template, copying the planned numbers (`SetValues` is in `Models/` for this). `WorkoutLibrary.canStart` is the start check; Start must also refuse a soft-deleted template (`isSoftDeleted`), because the detail keeps showing a template that was deleted while it was open (step 10 review). `lastPerformed` starts showing real data once sessions are saved. The set screen shows 0 kg as "Bodyweight" through `Formatters.weight`.
+- **Phase 5:** History reaches templates through `WorkoutSession.workout`, including soft-deleted ones (`workout(id:)` doesn't filter them). Set rows use `Formatters.weight`. Each Workouts list row runs `lastPerformed`, which loads all of the template's sessions on every list redraw; if the list gets slow with real history, compute the subtitles once per body run or move the row into its own view (step 10 review).
 - **Phase 7:** export includes `Workout.updatedAt` and the exercise defaults. Row IDs are stable across edits.
 - **Later:** a "Discard Changes?" prompt when the editor is swiped down with changes (needs a UIKit presentation-controller bridge).
 
@@ -263,7 +263,8 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
   - Delete a template from its editor: the app returns to the list once, without a double pop.
   - A 0 kg set shows "Bodyweight" in the editor summary and the detail.
   - kg fields in the sets screen: type 22,5 with a Czech region and with a US region; every kg field has its Done bar (the screen lives in a sheet, where SwiftUI's keyboard toolbar used to fail); the kg field of the last set isn't hidden by the keyboard. On iOS 27 the Done bar is the system's round checkmark button above the keyboard, not the word "Done". The iOS 18.2 simulators have a hardware keyboard connected, so press ⌘K (I/O → Keyboard → Toggle Software Keyboard) to check that the last kg field stays above the on-screen keyboard; on iOS 27 this was confirmed in the step 9 review.
-  - The list scrolls under the Start Workout bar without rows showing through.
+  - The list scrolls under the Start Workout bar without rows showing through; on iOS 27 it fades softly into the bar.
+  - The orange warning symbol and the "No exercises" text are readable in light and dark mode.
   - VoiceOver reads the list rows, set rows, the "Added" label and the summaries sensibly.
   - With VoiceOver and a Czech region, a 22.5 kg set is read sensibly ("22,5 kilograms"). If it isn't, revisit the spoken number format (step 3 review).
   - Largest accessibility text size: the editor, the sets screen and the detail still lay out without clipping.
