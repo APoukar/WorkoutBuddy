@@ -202,17 +202,20 @@ struct WorkoutEditorView: View {
 
     // MARK: Destinations
 
-    /// The sets screen is a placeholder until step 9.
     @ViewBuilder
     private func destination(for route: WorkoutEditorRoute) -> some View {
         switch route {
         case .picker:
             ExercisePickerView(addedExerciseIDs: Set(draft.exercises.map(\.exerciseID)), onPick: add)
         case .sets(let id):
-            ContentUnavailableView("Sets", systemImage: "list.number", description: Text("Coming soon."))
-                .navigationTitle(draft.exercises.first { $0.id == id }.map { exerciseName($0.exerciseID) } ?? "Sets")
-                .navigationBarTitleDisplayMode(.inline)
+            ExerciseSetsView(draft: $draft, draftExerciseID: id, title: setsTitle(forRow: id))
         }
+    }
+
+    /// The title of the sets screen: the exercise's name, or "Sets" if the row is no longer in the draft.
+    private func setsTitle(forRow id: UUID) -> String {
+        guard let row = draft.exercises.first(where: { $0.id == id }) else { return "Sets" }
+        return exerciseName(row.exerciseID)
     }
 
     // MARK: Actions

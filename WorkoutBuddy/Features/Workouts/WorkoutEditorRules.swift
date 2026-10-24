@@ -1,6 +1,6 @@
 import Foundation
 
-/// Where the template editor's navigation stack can go. Steps 8 and 9 add the destination views.
+/// Where the template editor's navigation stack can go. The destinations are `ExercisePickerView` and `ExerciseSetsView`.
 nonisolated enum WorkoutEditorRoute: Hashable {
     /// The sets screen of one exercise row. The ID is the `DraftExercise.id` (the row in the draft),
     /// not the ID of the `Exercise` it points to.

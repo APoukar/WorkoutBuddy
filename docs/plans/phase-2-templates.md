@@ -213,7 +213,7 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
 
 **Step 9 — Sets screen**
 - `Features/Workouts/ExerciseSetsView.swift`: the `.sets(draftExerciseID:)` destination. It takes `@Binding var draft: WorkoutDraft` and the draft exercise ID, and builds every binding through the draft's ID-based helpers (step 3). If the exercise is no longer in the draft, it shows nothing and doesn't crash.
-  - Title: the exercise name.
+  - Title: the exercise name, passed in by the editor, which already looks it up (step 9 review).
   - One section per set, `ForEach` keyed by **set ID** (`WeightField` keeps its text in `@State`, so index keys would show stale text after a delete), headed "Set 1", "Set 2", …, with `RepsStepper`, `WeightField` and `RestStepper`.
   - Each section ends with a destructive "Delete Set" button, hidden when it's the only set.
   - An "Add Set" button at the end runs `draft.addSet`, which copies the previous set.
@@ -262,7 +262,7 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
   - Delete a template's only exercise in Settings → Exercises: the list and detail show it needs exercises, Start Workout is disabled, and the editor can't save until an exercise is added.
   - Delete a template from its editor: the app returns to the list once, without a double pop.
   - A 0 kg set shows "Bodyweight" in the editor summary and the detail.
-  - kg fields in the sets screen: type 22,5 with a Czech region and with a US region; every kg field has its Done bar (the screen lives in a sheet, where SwiftUI's keyboard toolbar used to fail); the kg field of the last set isn't hidden by the keyboard.
+  - kg fields in the sets screen: type 22,5 with a Czech region and with a US region; every kg field has its Done bar (the screen lives in a sheet, where SwiftUI's keyboard toolbar used to fail); the kg field of the last set isn't hidden by the keyboard. On iOS 27 the Done bar is the system's round checkmark button above the keyboard, not the word "Done". The iOS 18.2 simulators have a hardware keyboard connected, so press ⌘K (I/O → Keyboard → Toggle Software Keyboard) to check that the last kg field stays above the on-screen keyboard; on iOS 27 this was confirmed in the step 9 review.
   - The list scrolls under the Start Workout bar without rows showing through.
   - VoiceOver reads the list rows, set rows, the "Added" label and the summaries sensibly.
   - With VoiceOver and a Czech region, a 22.5 kg set is read sensibly ("22,5 kilograms"). If it isn't, revisit the spoken number format (step 3 review).
