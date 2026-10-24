@@ -121,7 +121,7 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
 - `activeSession() throws -> WorkoutSession?`: the session with status `inProgress` (raw-string predicate). If several exist (only possible through a bug), the newest `startedAt` wins and the result is logged.
 - `snapshot(of:) -> SessionSnapshot`, built from `orderedExercises` / `orderedSets`.
 - `start(_ workout: Workout, now:) throws -> WorkoutSession`: refuses `.alreadyActive` and `.cannotStart` (soft-deleted, or `!WorkoutLibrary.canStart`) before changing anything; inserts the session, its `SessionExercise`s (rows with an exercise only, renumbered from 0) and `SessionSet`s with the planned numbers copied and status `pending`; saves once.
-- Actions, each as described in the Decisions: `completeSet(in:setID:reps:kg:now:)` (reps clamped, kg snapped), `skipSet(in:setID:now:)`, `skipRest(in:now:)`, `undo(in:setID:now:)`, `finishRest(in:now:)` (the foreground auto-advance: clears an expired rest; a no-op otherwise). The set actions do nothing unless `setID` is the set they apply to right now (the current set; for Undo, the undo target), so a stale screen or a double tap can't touch the wrong set.
+- Actions, each as described in the Decisions: `completeSet(in:setID:reps:kg:now:)` (reps clamped, kg snapped), `skipSet(in:setID:now:)`, `skipRest(in:now:)`, `undo(in:setID:now:)`, `finishRest(in:now:)` (the foreground auto-advance: clears an expired rest; a no-op otherwise). The set actions do nothing unless `setID` is the set they apply to right now (the current set; for Undo, the undo target), so a stale screen or a double tap can't touch the wrong set. Done, Skip Set, Skip Rest and Undo also do nothing while paused (the overlay hides them, and Done would compute the rest from the frozen time); `finishRest` still clears a rest that expired before the pause (step 3 implementer, accepted in review).
 - Tests (in-memory container, fixed dates):
   - start copies rows in order, the planned numbers and the exercise refs; skips rows without an exercise; doesn't copy names (renaming the exercise later changes what the session shows); refuses a second session, a soft-deleted template and an empty template without changing the store
   - editing the template after start leaves the session's planned numbers alone
@@ -248,3 +248,9 @@ The user was asleep, so the main session settled these. Each can be revisited.
 2. The `.cannotStart` text advised adding an exercise, also for a deleted template → **accepted**: neutral "This workout can't be started."
 3. Step 3 still said it defines `SessionError` → **accepted**: plan updated.
 4. `duration` and `spokenDuration` look like a pair but aren't → **accepted**: cross-referencing doc comments, no rename.
+
+**Step 3 code review, verdict "Approve with fixes", 4 minor findings** (plus the implementer's deviation, **accepted**: the set actions are no-ops while paused):
+1. Missing tests for `finishRest` while paused and for `start` refusing while a session waits for Save → **accepted**, both added.
+2. A test name promised a pause fold it couldn't reach → **accepted**: renamed; step 4's "end early while paused" covers the fold.
+3. The last-set test didn't check the `endedAt` value → **accepted**.
+4. The doc comment overstated the paused guard → **accepted**: names the set actions exactly.
