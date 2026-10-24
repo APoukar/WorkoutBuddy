@@ -5,12 +5,31 @@ import Testing
 struct FormattersTests {
     private let us = Locale(identifier: "en_US")
     private let cs = Locale(identifier: "cs_CZ")
+    private let enCZ = Locale(identifier: "en_CZ")
 
     @Test func kgFormatting() {
         #expect(Formatters.kg(22.5, locale: us) == "22.5")
         #expect(Formatters.kg(22.5, locale: cs) == "22,5")
         #expect(Formatters.kg(20, locale: us) == "20")
         #expect(Formatters.kg(20, locale: cs) == "20")
+    }
+
+    @Test func weightFormatting() {
+        #expect(Formatters.weight(22.5, locale: us) == "22.5\u{00A0}kg")
+        #expect(Formatters.weight(22.5, locale: enCZ) == "22,5\u{00A0}kg")
+        #expect(Formatters.weight(60, locale: us) == "60\u{00A0}kg")
+        #expect(Formatters.weight(0.5, locale: us) == "0.5\u{00A0}kg")
+        #expect(Formatters.weight(0, locale: us) == "Bodyweight")
+        #expect(Formatters.weight(0, locale: enCZ) == "Bodyweight")
+    }
+
+    @Test func spokenWeightFormatting() {
+        #expect(Formatters.spokenWeight(22.5, locale: us) == "22.5 kilograms")
+        #expect(Formatters.spokenWeight(22.5, locale: enCZ) == "22,5 kilograms")
+        #expect(Formatters.spokenWeight(60, locale: us) == "60 kilograms")
+        #expect(Formatters.spokenWeight(1, locale: us) == "1 kilogram")
+        #expect(Formatters.spokenWeight(0, locale: us) == "bodyweight")
+        #expect(Formatters.spokenWeight(0, locale: enCZ) == "bodyweight")
     }
 
     @Test func restFormatting() {

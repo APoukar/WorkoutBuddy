@@ -1,11 +1,6 @@
 import Foundation
 import SwiftData
 
-enum ExerciseNameError: Error, Equatable {
-    case empty
-    case duplicate
-}
-
 /// Exercise library operations. Every change is saved immediately.
 @MainActor
 struct ExerciseLibrary {
@@ -14,35 +9,35 @@ struct ExerciseLibrary {
     /// Checks a name against the rules: not empty, and unique (case-insensitive) among active exercises.
     /// Pass `excluding` when renaming so the exercise doesn't clash with itself.
     /// A failed fetch counts as "no error" here; `add` and `rename` re-validate with a throwing fetch before saving.
-    func validate(name: String, excluding: Exercise? = nil) -> ExerciseNameError? {
+    func validate(name: String, excluding: Exercise? = nil) -> NameError? {
         (try? checkName(name, excluding: excluding)) ?? nil
     }
 
-    private func checkName(_ name: String, excluding: Exercise?) throws -> ExerciseNameError? {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty { return .empty }
+    private func checkName(_ name: String, excluding: Exercise?) throws -> NameError? {
+        // An empty name needs no fetch, so it's reported even if the fetch would fail.
+        if NameRules.check(name, against: []) == .empty { return .empty }
         let active = try context.fetch(FetchDescriptor<Exercise>(predicate: #Predicate { !$0.isArchived }))
-        let clash = active.contains {
-            $0.id != excluding?.id && $0.name.caseInsensitiveCompare(trimmed) == .orderedSame
-        }
-        return clash ? .duplicate : nil
+        return NameRules.check(name, against: active.map { (id: $0.id, name: $0.name) }, excluding: excluding?.id)
     }
 
     @discardableResult
-    func add(name: String, muscleGroup: MuscleGroup) throws -> Exercise {
+    func add(name: String, muscleGroup: MuscleGroup, defaults: ExerciseDefaults = .none) throws -> Exercise {
         if let error = try checkName(name, excluding: nil) { throw error }
         let exercise = Exercise(
             name: name.trimmingCharacters(in: .whitespacesAndNewlines), muscleGroup: muscleGroup, isCustom: true)
+        exercise.defaults = defaults.clamped()
         context.insert(exercise)
         do { try context.save() } catch { context.rollback(); throw error }
         return exercise
     }
 
-    /// Edits name and muscle group together: validates, sets both and saves once, so an edit is never half saved.
-    func update(_ exercise: Exercise, name: String, muscleGroup: MuscleGroup) throws {
+    /// Edits name, muscle group and defaults together: validates, sets every field and saves once,
+    /// so an edit is never half saved. Defaults are stored clamped.
+    func update(_ exercise: Exercise, name: String, muscleGroup: MuscleGroup, defaults: ExerciseDefaults) throws {
         if let error = try checkName(name, excluding: exercise) { throw error }
         exercise.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         exercise.muscleGroup = muscleGroup
+        exercise.defaults = defaults.clamped()
         do { try context.save() } catch { context.rollback(); throw error }
     }
 

@@ -32,7 +32,7 @@ A personal iPhone app for planning gym workouts, running them set by set with gu
     1. the exercise's own defaults (F1)
     2. the values last used for that exercise in a template
     3. the defaults from Settings (F9)
-- **Validation:** a template needs at least 1 exercise, and every exercise needs at least 1 set. Reps ≥ 1, kg ≥ 0 (0 = bodyweight) in 0.5 kg steps, rest 0–10 min.
+- **Validation:** a template needs at least 1 exercise, and every exercise needs at least 1 set. Reps ≥ 1, kg ≥ 0 (0 = bodyweight) in 0.5 kg steps, rest 0–10 min. Wherever a weight is shown as text, 0 kg reads **Bodyweight**.
 - Editing a template never changes past sessions.
 - From a template's detail view, you can **Start workout**.
 
@@ -97,7 +97,7 @@ A personal iPhone app for planning gym workouts, running them set by set with gu
 
 ## 4. Conceptual data model
 - **Exercise**: id, name, muscleGroup, isCustom, isArchived, optional defaultReps / defaultKg / defaultRestSeconds
-- **Workout** (template): id, name, createdAt, isSoftDeleted (named so because SwiftData models already have an `isDeleted` property), sessions (inverse of the session's workout ref) → ordered **WorkoutExercise** (exercise ref) → ordered **PlannedSet** (reps, kg, restSeconds)
+- **Workout** (template): id, name, createdAt, updatedAt (last saved in the editor; used for "values last used in a template"), isSoftDeleted (named so because SwiftData models already have an `isDeleted` property), sessions (inverse of the session's workout ref) → ordered **WorkoutExercise** (exercise ref) → ordered **PlannedSet** (reps, kg, restSeconds)
 - **WorkoutSession**: id, workout ref, startedAt, endedAt, pausedDuration, status (inProgress / completed / endedEarly) → ordered **SessionExercise** (exercise ref) → ordered **SessionSet** (planned reps/kg/rest, actual reps/kg, status pending / done / skipped / notPerformed, completedAt)
 - Rules:
   - Sessions **copy the planned numbers**, because templates can change later.
@@ -109,7 +109,7 @@ Apple Watch app · iPad · iCloud sync / import · HealthKit · interactive Live
 ## 6. Open points (defaults chosen, revisit when planning)
 - **Accidental Done:** default is an **Undo** button on the rest screen that returns to the set.
 - **Weight changed mid-exercise:** a change applies to the current set only and doesn't carry over to the remaining sets.
-- **"Values last used in a template" (F2):** the default is the first set of that exercise in the template that was saved most recently, among active templates. Confirm this when planning phase 2.
+- **"Values last used in a template" (F2):** the first set of that exercise in the template that was saved most recently, among active templates. Confirmed in phase 2 planning.
 
 ## 7. Suggested implementation phases
 1. Foundation: Xcode project, SwiftData models, exercise seed, Settings → Exercises (F1, F9 basics)

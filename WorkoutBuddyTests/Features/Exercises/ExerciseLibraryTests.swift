@@ -24,9 +24,9 @@ struct ExerciseLibraryTests {
         let lib = ExerciseLibrary(context: tc.context)
         let e = try lib.add(name: "  Cable Fly  ", muscleGroup: .chest)
         #expect(e.name == "Cable Fly" && e.isCustom && e.muscleGroup == .chest)
-        try lib.update(e, name: "Cable Crossover", muscleGroup: .chest)
+        try lib.update(e, name: "Cable Crossover", muscleGroup: .chest, defaults: .none)
         #expect(e.name == "Cable Crossover")
-        try lib.update(e, name: "Cable Crossover", muscleGroup: .shoulders)
+        try lib.update(e, name: "Cable Crossover", muscleGroup: .shoulders, defaults: .none)
         #expect(e.muscleGroup == .shoulders)
         #expect(lib.exercise(id: e.id) === e)
     }
@@ -36,7 +36,7 @@ struct ExerciseLibraryTests {
         let lib = ExerciseLibrary(context: tc.context)
         #expect(lib.validate(name: "") == .empty)
         #expect(lib.validate(name: "  \n ") == .empty)
-        #expect(throws: ExerciseNameError.empty) { try lib.add(name: " ", muscleGroup: .core) }
+        #expect(throws: NameError.empty) { try lib.add(name: " ", muscleGroup: .core) }
     }
 
     @Test func duplicatesDifferingInCaseRejected() throws {
@@ -45,9 +45,9 @@ struct ExerciseLibraryTests {
         try lib.add(name: "Bench Press", muscleGroup: .chest)
         #expect(lib.validate(name: "bench press") == .duplicate)
         #expect(lib.validate(name: " BENCH PRESS ") == .duplicate)
-        #expect(throws: ExerciseNameError.duplicate) { try lib.add(name: "bench PRESS", muscleGroup: .chest) }
+        #expect(throws: NameError.duplicate) { try lib.add(name: "bench PRESS", muscleGroup: .chest) }
         let other = try lib.add(name: "Squat", muscleGroup: .legs)
-        #expect(throws: ExerciseNameError.duplicate) { try lib.update(other, name: "bench press", muscleGroup: .legs) }
+        #expect(throws: NameError.duplicate) { try lib.update(other, name: "bench press", muscleGroup: .legs, defaults: .none) }
         #expect(other.name == "Squat")
     }
 
@@ -66,7 +66,7 @@ struct ExerciseLibraryTests {
         let lib = ExerciseLibrary(context: tc.context)
         let e = try lib.add(name: "Bench Press", muscleGroup: .chest)
         #expect(lib.validate(name: "bench press", excluding: e) == nil)
-        try lib.update(e, name: "bench press", muscleGroup: .chest)
+        try lib.update(e, name: "bench press", muscleGroup: .chest, defaults: .none)
         #expect(e.name == "bench press")
     }
 
@@ -74,7 +74,7 @@ struct ExerciseLibraryTests {
         let tc = try TestContainer()
         let lib = ExerciseLibrary(context: tc.context)
         let e = try lib.add(name: "Fly", muscleGroup: .chest)
-        try lib.update(e, name: "  Cable Fly ", muscleGroup: .shoulders)
+        try lib.update(e, name: "  Cable Fly ", muscleGroup: .shoulders, defaults: .none)
         #expect(e.name == "Cable Fly" && e.muscleGroup == .shoulders)
     }
 
@@ -82,9 +82,9 @@ struct ExerciseLibraryTests {
         let tc = try TestContainer()
         let lib = ExerciseLibrary(context: tc.context)
         let e = try lib.add(name: "Bench Press", muscleGroup: .chest)
-        try lib.update(e, name: "bench press", muscleGroup: .chest)
+        try lib.update(e, name: "bench press", muscleGroup: .chest, defaults: .none)
         #expect(e.name == "bench press")
-        try lib.update(e, name: "bench press", muscleGroup: .triceps)
+        try lib.update(e, name: "bench press", muscleGroup: .triceps, defaults: .none)
         #expect(e.name == "bench press" && e.muscleGroup == .triceps)
     }
 
@@ -93,9 +93,58 @@ struct ExerciseLibraryTests {
         let lib = ExerciseLibrary(context: tc.context)
         try lib.add(name: "Bench Press", muscleGroup: .chest)
         let other = try lib.add(name: "Squat", muscleGroup: .legs)
-        #expect(throws: ExerciseNameError.duplicate) { try lib.update(other, name: "BENCH press", muscleGroup: .core) }
-        #expect(throws: ExerciseNameError.empty) { try lib.update(other, name: "  ", muscleGroup: .core) }
+        #expect(throws: NameError.duplicate) { try lib.update(other, name: "BENCH press", muscleGroup: .core, defaults: .none) }
+        #expect(throws: NameError.empty) { try lib.update(other, name: "  ", muscleGroup: .core, defaults: .none) }
         #expect(other.name == "Squat" && other.muscleGroup == .legs)
+    }
+
+    @Test func addStoresDefaultsClampedAndWithoutDefaultsStoresNone() throws {
+        let tc = try TestContainer()
+        let lib = ExerciseLibrary(context: tc.context)
+        let plain = try lib.add(name: "Plain", muscleGroup: .chest)
+        #expect(plain.defaults == .none)
+        let exact = try lib.add(
+            name: "Exact", muscleGroup: .chest, defaults: ExerciseDefaults(reps: 8, kg: 62.5, restSeconds: 120))
+        #expect(exact.defaults == ExerciseDefaults(reps: 8, kg: 62.5, restSeconds: 120))
+        let wild = try lib.add(
+            name: "Wild", muscleGroup: .chest, defaults: ExerciseDefaults(reps: 0, kg: 22.3, restSeconds: 9000))
+        #expect(wild.defaults == ExerciseDefaults(reps: 1, kg: 22.5, restSeconds: 600))
+        // Persisted, not just set in memory.
+        let fetched = try ModelContext(tc.container).fetch(FetchDescriptor<Exercise>(predicate: #Predicate { $0.name == "Wild" }))
+        #expect(fetched.first?.defaults == ExerciseDefaults(reps: 1, kg: 22.5, restSeconds: 600))
+    }
+
+    @Test func updateStoresDefaultsClampedAndClearsThemWithNil() throws {
+        let tc = try TestContainer()
+        let lib = ExerciseLibrary(context: tc.context)
+        let e = try lib.add(name: "Row", muscleGroup: .back)
+        try lib.update(
+            e, name: "Row", muscleGroup: .back, defaults: ExerciseDefaults(reps: 12, kg: 40.3, restSeconds: 75))
+        #expect(e.defaults == ExerciseDefaults(reps: 12, kg: 40.5, restSeconds: 75))
+        try lib.update(
+            e, name: "Row", muscleGroup: .back, defaults: ExerciseDefaults(reps: 999, kg: nil, restSeconds: -1))
+        #expect(e.defaults == ExerciseDefaults(reps: 100, kg: nil, restSeconds: 0))
+        try lib.update(e, name: "Row", muscleGroup: .back, defaults: .none)
+        #expect(e.defaults == .none)
+        let fetched = try tc.context.fetch(FetchDescriptor<Exercise>(predicate: #Predicate { $0.name == "Row" }))
+        #expect(fetched.first?.defaults == ExerciseDefaults.none)
+        #expect(!tc.context.hasChanges)
+    }
+
+    @Test func rejectedUpdateLeavesNameGroupAndDefaultsUnchanged() throws {
+        let tc = try TestContainer()
+        let lib = ExerciseLibrary(context: tc.context)
+        try lib.add(name: "Bench Press", muscleGroup: .chest)
+        let original = ExerciseDefaults(reps: 8, kg: 60, restSeconds: 120)
+        let other = try lib.add(name: "Squat", muscleGroup: .legs, defaults: original)
+        #expect(throws: NameError.duplicate) {
+            try lib.update(
+                other, name: "bench press", muscleGroup: .core,
+                defaults: ExerciseDefaults(reps: 3, kg: 100, restSeconds: 30))
+        }
+        #expect(other.name == "Squat" && other.muscleGroup == .legs)
+        #expect(other.defaults == original)
+        #expect(!tc.context.hasChanges)
     }
 
     @Test func archiveHidesFromActiveFetchButIDLookupFinds() throws {

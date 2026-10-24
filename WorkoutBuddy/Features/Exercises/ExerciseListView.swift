@@ -66,7 +66,7 @@ struct ExerciseListView: View {
         }
         .exerciseDeletionAlert(
             $pendingDeletion, library: library, onFailure: { failure = $0 })
-        .exerciseErrorAlert($failure)
+        .errorAlert($failure, message: ExerciseMessages.failureMessage(for:))
     }
 
     private func requestDeletion(of exercise: Exercise) {
