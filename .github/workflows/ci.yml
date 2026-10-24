@@ -10,9 +10,6 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=latest
-
 jobs:
   build-and-test:
     runs-on: xcode-27
@@ -22,6 +19,16 @@ jobs:
 
       - name: Show Xcode version
         run: xcodebuild -version
+
+      # The runner's preinstalled iPhone simulators are paired with Apple Watch
+      # simulators whose watchOS runtime is missing, so xcodebuild can't clone
+      # them for testing. Create a fresh, unpaired iPhone 17 on the latest iOS.
+      - name: Create simulator
+        run: |
+          RUNTIME=$(xcrun simctl list runtimes iOS -j | jq -r '[.runtimes[] | select(.isAvailable)] | last | .identifier')
+          UDID=$(xcrun simctl create "CI iPhone 17" "iPhone 17" "$RUNTIME")
+          echo "Created $UDID on $RUNTIME"
+          echo "DESTINATION=platform=iOS Simulator,id=$UDID" >> "$GITHUB_ENV"
 
       - name: Build
         run: >
