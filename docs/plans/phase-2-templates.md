@@ -194,7 +194,7 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
     - When the draft has `.noExercises`, the section footer says "Add at least one exercise."
   - The editor shows only these two messages: the inline name error under the name field, and the "Add at least one exercise." footer. `.emptyName` isn't shown a second time anywhere, and `.exerciseWithoutSets` can't happen through the UI, so neither gets its own text on screen (step 6 review).
   - Toolbar: Cancel, and Save, which is disabled while the name is invalid or the draft has issues. Save calls `WorkoutLibrary.save` and dismisses. With no changes, Save only dismisses, without writing (step 7 review).
-  - The name field is focused only the first time the editor appears when creating, not again after returning from the picker or the sets screen (step 7 review).
+  - The name field is focused only the first time the editor appears when creating, not again after returning from the picker or the sets screen (step 7 review). iOS restores a text field's focus when a pushed screen is popped, so "Add Exercise" and the exercise rows clear the name focus before they push (a button that sets the focus to `false` and then appends to the path, with a trailing chevron so it still looks like a navigation row) (step 8 review). In Edit mode the exercise rows don't open the sets screen and hide their chevron, like system navigation rows; "Add Exercise" keeps working and keeps its chevron (agreed with the user).
   - Cancel with changes shows a "Discard Changes?" confirmation dialog, attached to the Cancel button. Swipe-to-dismiss is disabled while there are changes (`.interactiveDismissDisabled`); see the Decisions for why there's no prompt.
   - When editing, a destructive **Delete Workout** button at the bottom uses `.workoutDeletionAlert`. After the deletion it calls an `onDeleted` callback and dismisses; the caller decides what to pop (step 10).
   - Errors use `.errorAlert`.
@@ -203,9 +203,9 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
 **Step 8 — Exercise picker**
 - `Features/Workouts/ExercisePickerView.swift`: pushed inside the editor's `NavigationStack` (the `.picker` route), not presented as a sheet.
   - A `@Query` of active exercises, in sections from `ExerciseGrouping.grouped(_:matching:in:)`, with `.searchable`.
-  - The muscle-group filter is a toolbar `Menu` holding a `Picker` with "All Muscle Groups" plus each group. The menu's icon shows when a filter is active (`line.3.horizontal.decrease.circle` / `.fill`), and it has an accessibility label naming the current filter.
-  - No matches shows `ContentUnavailableView.search`; a filter with no exercises shows "No Exercises" with the group's name.
-  - Exercises already in the draft are disabled and show a trailing "Added" label, read by VoiceOver.
+  - The muscle-group filter is a toolbar `Menu` holding a `Picker` with "All Muscle Groups" plus each group. The menu's icon shows when a filter is active (`line.3.horizontal.decrease.circle` / `.fill`). VoiceOver reads the accessibility label "Muscle Group Filter" with the current filter as its value ("Chest" or "All Muscle Groups") (step 8 review).
+  - No matches shows `ContentUnavailableView.search`. A filter with no exercises shows "No Exercises" / "No exercises in Chest.", and this wins over the search result. With no exercises at all it shows "No Exercises" / "Add exercises in Settings → Exercises." (step 8 review). Searching inside a filter doesn't hint at other groups; the filled filter icon is the only sign that a filter is on (accepted).
+  - Exercises already in the draft are disabled and show a trailing "Added" label, read by VoiceOver. The row is a `LabeledContent`, so "Added" moves below the name at accessibility text sizes. After a pick, VoiceOver announces "Bench Press added" (step 8 review).
   - Tapping an exercise calls `onPick(exercise)` and the picker stays open; the row turns "Added". Back returns to the editor. There's no Cancel.
   - The picker can't create exercises (F2).
 - `WorkoutEditorView`: "Add Exercise" pushes the picker. A pick runs `draft.addExercise(exerciseID:firstSet:)` with `WorkoutLibrary.firstSetValues(for:settings: AppSettings.current())`.
@@ -255,7 +255,7 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
   - "Add Set" copies the previous set. The last set can't be deleted.
   - Reorder with Edit/Done and remove exercises, save, reopen: the order and the sets are kept. With VoiceOver, "Move Up" and "Move Down" reorder too.
   - Create "push": it's rejected as a duplicate. Delete "Push", then create "Push": it's allowed.
-  - The picker shows exercises already in the template as "Added", stays open after each pick, and the muscle-group filter and search work together.
+  - The picker shows exercises already in the template as "Added", stays open after each pick, and the muscle-group filter and search work together. On iOS 27 the search field and the filter menu don't overlap, and the filter icon doesn't look like a circle inside the toolbar button's own circle; if it does, use the plain `line.3.horizontal.decrease` on iOS 26+ (step 8 review). With VoiceOver, a pick is announced ("Bench Press added").
   - Cancel after an edit asks "Discard Changes?", shown from the Cancel button on iOS 27. Swiping the sheet down is blocked while there are changes. Save without changes just closes the editor.
   - The name field is focused when the New Workout sheet opens. Going back from the picker or the sets screen doesn't reopen the keyboard.
   - In Edit mode, "Add Exercise" and "Delete Workout" still work. Swiping a row to delete it doesn't briefly switch the header's Edit button to "Done".

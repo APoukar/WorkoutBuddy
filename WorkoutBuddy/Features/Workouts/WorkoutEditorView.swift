@@ -115,7 +115,7 @@ struct WorkoutEditorView: View {
             ForEach(Array(draft.exercises.enumerated()), id: \.element.id) { index, row in
                 // Looked up once per row, for both the visible and the accessibility label.
                 let name = exerciseName(row.exerciseID)
-                NavigationLink(value: WorkoutEditorRoute.sets(draftExerciseID: row.id)) {
+                pushRow(.sets(draftExerciseID: row.id), inertWhileEditing: true) {
                     exerciseRowLabel(row, name: name)
                 }
                 .accessibilityLabel(name)
@@ -132,8 +132,12 @@ struct WorkoutEditorView: View {
             .onDelete { draft.removeExercises(atOffsets: $0) }
             .onMove { draft.moveExercises(fromOffsets: $0, toOffset: $1) }
 
-            NavigationLink(value: WorkoutEditorRoute.picker) {
-                Label("Add Exercise", systemImage: "plus.circle.fill")
+            pushRow(.picker) {
+                Label {
+                    Text("Add Exercise").foregroundStyle(.primary)
+                } icon: {
+                    Image(systemName: "plus.circle.fill")
+                }
             }
         } header: {
             HStack {
@@ -153,6 +157,35 @@ struct WorkoutEditorView: View {
         }
     }
 
+    /// A row that looks and reads like a `NavigationLink` but pushes through `push`, which clears the name field's
+    /// focus first. A `NavigationLink` can't do that: iOS gives the field focus back on pop if it had it at the push.
+    /// With `inertWhileEditing`, the row doesn't navigate and hides its chevron in Edit mode, like a link.
+    private func pushRow<Content: View>(
+        _ route: WorkoutEditorRoute,
+        inertWhileEditing: Bool = false,
+        @ViewBuilder label: () -> Content
+    ) -> some View {
+        let label = label()
+        let isInert = inertWhileEditing && editMode.isEditing
+        return Button {
+            if !isInert { push(route) }
+        } label: {
+            HStack {
+                label
+                Spacer()
+                // Like a system disclosure indicator, which Edit mode hides too.
+                if !isInert {
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
+                }
+            }
+            .foregroundStyle(.primary)
+            .contentShape(Rectangle())
+        }
+    }
+
     private func exerciseRowLabel(_ row: DraftExercise, name: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(name)
@@ -169,14 +202,12 @@ struct WorkoutEditorView: View {
 
     // MARK: Destinations
 
-    /// Placeholders until the exercise picker (step 8) and the sets screen (step 9) exist.
+    /// The sets screen is a placeholder until step 9.
     @ViewBuilder
     private func destination(for route: WorkoutEditorRoute) -> some View {
         switch route {
         case .picker:
-            ContentUnavailableView("Exercise Picker", systemImage: "list.bullet", description: Text("Coming soon."))
-                .navigationTitle("Add Exercise")
-                .navigationBarTitleDisplayMode(.inline)
+            ExercisePickerView(addedExerciseIDs: Set(draft.exercises.map(\.exerciseID)), onPick: add)
         case .sets(let id):
             ContentUnavailableView("Sets", systemImage: "list.number", description: Text("Coming soon."))
                 .navigationTitle(draft.exercises.first { $0.id == id }.map { exerciseName($0.exerciseID) } ?? "Sets")
@@ -185,6 +216,19 @@ struct WorkoutEditorView: View {
     }
 
     // MARK: Actions
+
+    /// Clears the name field's focus, then pushes. The order matters: focus cleared after the push doesn't
+    /// stop iOS from restoring it (and the keyboard) on pop.
+    private func push(_ route: WorkoutEditorRoute) {
+        nameFocused = false
+        path.append(route)
+    }
+
+    /// Adds a picked exercise with its first set resolved by the F2 rule. Does nothing if it is already in the draft.
+    private func add(_ exercise: Exercise) {
+        let firstSet = library.firstSetValues(for: exercise, settings: AppSettings.current())
+        draft.addExercise(exerciseID: exercise.id, firstSet: firstSet)
+    }
 
     private func cancel(hasChanges: Bool) {
         if hasChanges {
