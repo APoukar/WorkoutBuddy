@@ -25,7 +25,9 @@ jobs:
       # them for testing. Create a fresh, unpaired iPhone 17 on the latest iOS.
       - name: Create simulator
         run: |
-          RUNTIME=$(xcrun simctl list runtimes iOS -j | jq -r '[.runtimes[] | select(.isAvailable)] | last | .identifier')
+          xcrun simctl list runtimes iOS
+          RUNTIME=$(xcrun simctl list runtimes iOS -j | jq -r '[.runtimes[] | select(.isAvailable and any(.supportedDeviceTypes[]; .name == "iPhone 17"))] | sort_by(.version | split(".") | map(tonumber)) | last | .identifier')
+          if [ -z "$RUNTIME" ] || [ "$RUNTIME" = "null" ]; then echo "No iOS runtime supports iPhone 17"; exit 1; fi
           UDID=$(xcrun simctl create "CI iPhone 17" "iPhone 17" "$RUNTIME")
           echo "Created $UDID on $RUNTIME"
           echo "DESTINATION=platform=iOS Simulator,id=$UDID" >> "$GITHUB_ENV"
