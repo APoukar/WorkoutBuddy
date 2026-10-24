@@ -32,7 +32,7 @@ struct ExerciseListView: View {
                 Section(section.group.displayName) {
                     ForEach(section.exercises) { exercise in
                         Button { editor = .edit(exercise) } label: {
-                            Text(exercise.name).foregroundStyle(.primary)
+                            Text(exercise.name).foregroundStyle(Color.primary)
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button("Delete") { requestDeletion(of: exercise) }

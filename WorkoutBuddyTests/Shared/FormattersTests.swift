@@ -85,6 +85,29 @@ struct FormattersTests {
         #expect(Formatters.needsTextRewrite(text: "22.5", value: 25, valueAtFocus: 20))
     }
 
+    /// Covers only the pure keystroke path (not cursor placement, which shows only in a running app).
+    /// Mirrors WeightField's per-keystroke handling: committedKg into the binding, then
+    /// needsTextRewrite on the resulting value (which must not rewrite the text mid-typing).
+    private func typeKeystrokes(_ texts: [String], startingAt start: Double) -> [Double] {
+        let valueAtFocus = start
+        var kg = start
+        var committed: [Double] = []
+        for text in texts {
+            let value = Formatters.committedKg(text: text, current: valueAtFocus)
+            if value != kg { kg = value }
+            #expect(!Formatters.needsTextRewrite(text: text, value: kg, valueAtFocus: valueAtFocus), "\(text)")
+            committed.append(kg)
+        }
+        return committed
+    }
+
+    @Test func typingCharacterByCharacterCommitsWithoutRewritingText() {
+        #expect(typeKeystrokes(["2", "22", "22,", "22,5"], startingAt: 25) == [2, 22, 22, 22.5])
+        #expect(typeKeystrokes(["2", "22", "22.", "22.5"], startingAt: 25) == [2, 22, 22, 22.5])
+        // Replacing the whole text from empty.
+        #expect(typeKeystrokes(["", "2", "22", "22,", "22,5"], startingAt: 25) == [25, 2, 22, 22, 22.5])
+    }
+
     @Test func snapKgEdges() {
         #expect(AppSettings.snapKg(-3) == 0)
         #expect(AppSettings.snapKg(.nan) == 0)
