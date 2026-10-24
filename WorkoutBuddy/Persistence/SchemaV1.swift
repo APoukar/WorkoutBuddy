@@ -30,6 +30,16 @@ nonisolated enum SchemaV1: VersionedSchema {
             set { muscleGroupRaw = newValue.rawValue }
         }
 
+        /// The three default fields as one value. Declared here, not in an extension, so it stays nonisolated.
+        var defaults: ExerciseDefaults {
+            get { ExerciseDefaults(reps: defaultReps, kg: defaultKg, restSeconds: defaultRestSeconds) }
+            set {
+                defaultReps = newValue.reps
+                defaultKg = newValue.kg
+                defaultRestSeconds = newValue.restSeconds
+            }
+        }
+
         init(
             id: UUID = UUID(), name: String, muscleGroup: MuscleGroup, isCustom: Bool = false, isArchived: Bool = false,
             defaultReps: Int? = nil, defaultKg: Double? = nil, defaultRestSeconds: Int? = nil

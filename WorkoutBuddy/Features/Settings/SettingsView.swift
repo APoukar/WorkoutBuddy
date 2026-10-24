@@ -42,7 +42,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Defaults for new sets")
                 } footer: {
-                    Text("Used when you add a set to a workout.")
+                    Text("Used for a new exercise\u{2019}s first set when the exercise has no defaults of its own and isn\u{2019}t in any saved workout.")
                 }
                 Section {
                     Picker("Weight Step", selection: weightStepBinding) {

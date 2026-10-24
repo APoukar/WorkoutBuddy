@@ -32,7 +32,7 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
 - **0 kg is shown as "Bodyweight"** wherever a weight is displayed as text (summaries, set rows; spoken "bodyweight"). Editing controls still show the number 0. Later phases (set screen, history, progress) follow the same rule.
 - **The Workouts list is sorted by name** (`localizedStandardCompare`), in memory.
 - **Deleting a template asks for confirmation** ("Delete “Push”?" / "Past sessions stay in your history.") from both the list's swipe action and the editor. It soft-deletes; there's no restore in v1.
-- **Each exercise default can be left unset.** The exercise editor has a toggle per value. Turning a toggle on starts the value at the current Settings default.
+- **Each exercise default can be left unset.** The exercise editor has a toggle per value ("Custom Reps", "Custom Weight", "Custom Rest"). A value that isn't set starts at the current Settings default when the editor opens; turning a toggle off and on again keeps its value.
 - **Schema V1 is still edited in place.** No real data is on a device yet (the app has only run in the simulator), so new fields need no migration plan.
 
 ## Scope
@@ -84,7 +84,8 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
   - `add(name:muscleGroup:defaults: ExerciseDefaults = .none)`
   - `update(_:name:muscleGroup:defaults:)`, replacing the current `update`. It still validates, sets every field and saves once, with rollback, so an edit is never half saved. Defaults are stored clamped.
 - `ExerciseEditorView`: a new section "Defaults for new sets" below the muscle group:
-  - Three toggles, "Reps", "Weight" and "Rest". When a toggle is on, the matching control (`RepsStepper`, `WeightField`, `RestStepper`) appears right under it. Turning a toggle on starts the value at `AppSettings.current()`. Turning it off clears that default.
+  - Three toggles, "Custom Reps", "Custom Weight" and "Custom Rest". When a toggle is on, the matching control (`RepsStepper`, `WeightField`, `RestStepper`, with their own default labels "Reps", "Weight", "Rest") appears right under it, animated. The toggle names differ from the control labels so the screen and VoiceOver don't repeat the same label twice (step 2 review).
+  - A value that isn't set starts at `AppSettings.current()` when the editor opens. Turning a toggle off and on again keeps the value that was there, so an accidental tap never replaces a saved default with the Settings value (step 2 review). Turning a toggle off clears that default on save.
   - Footer: "Used for this exercise’s first set when you add it to a workout. Values that are off come from the last workout you saved with this exercise, then from Settings."
   - Save passes the defaults to `add` or `update`.
 - `SettingsView`: change the defaults footer to "Used for a new exercise’s first set when the exercise has no defaults of its own and isn’t in any saved workout."
@@ -242,7 +243,7 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
 - Each step: the CLAUDE.md build and test commands on iPhone 17 / OS 27.0 come out green, the tests also pass on iPhone 16 / OS 18.2, and `code-reviewer` reviews the step. Run the Release build locally for steps that touch previews or preview data (steps 6–10); CI runs it on every push anyway.
 - At the end of the phase, run the full test suite on iOS 18.2 once more.
 - **Part A manual check** (end of step 5), on iOS 27 and iOS 18.2:
-  - In Settings → Exercises, turn on each default for an exercise, change it, save and reopen: the values are kept. Turn one off: it stays off.
+  - In Settings → Exercises, turn on each default for an exercise, change it, save and reopen: the values are kept. Turn one off: it stays off. Turn a saved one off and on again before saving: it keeps its value. The rows slide in and out.
   - The kg default field accepts 22,5 and has its Done bar; the section lays out at the largest accessibility text size.
   - The Settings defaults footer shows the new wording.
 - **Part B manual check** (end of step 10), on iOS 27 and iOS 18.2:

@@ -29,20 +29,23 @@ struct ExerciseLibrary {
     }
 
     @discardableResult
-    func add(name: String, muscleGroup: MuscleGroup) throws -> Exercise {
+    func add(name: String, muscleGroup: MuscleGroup, defaults: ExerciseDefaults = .none) throws -> Exercise {
         if let error = try checkName(name, excluding: nil) { throw error }
         let exercise = Exercise(
             name: name.trimmingCharacters(in: .whitespacesAndNewlines), muscleGroup: muscleGroup, isCustom: true)
+        exercise.defaults = defaults.clamped()
         context.insert(exercise)
         do { try context.save() } catch { context.rollback(); throw error }
         return exercise
     }
 
-    /// Edits name and muscle group together: validates, sets both and saves once, so an edit is never half saved.
-    func update(_ exercise: Exercise, name: String, muscleGroup: MuscleGroup) throws {
+    /// Edits name, muscle group and defaults together: validates, sets every field and saves once,
+    /// so an edit is never half saved. Defaults are stored clamped.
+    func update(_ exercise: Exercise, name: String, muscleGroup: MuscleGroup, defaults: ExerciseDefaults) throws {
         if let error = try checkName(name, excluding: exercise) { throw error }
         exercise.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         exercise.muscleGroup = muscleGroup
+        exercise.defaults = defaults.clamped()
         do { try context.save() } catch { context.rollback(); throw error }
     }
 
