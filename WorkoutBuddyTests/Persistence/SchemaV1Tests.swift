@@ -184,6 +184,70 @@ struct SchemaV1Tests {
         #expect(try t.context.fetch(FetchDescriptor<Exercise>(predicate: #Predicate { !$0.isArchived })).isEmpty)
     }
 
+    @Test func newFieldsDefaultToNilAndCreatedAt() throws {
+        let t = try TestContainer()
+        let exercise = Exercise(name: "Row", muscleGroup: .back)
+        let created = Date(timeIntervalSince1970: 1_000_000)
+        let workout = Workout(name: "Pull", createdAt: created)
+        let explicit = Workout(name: "Other", createdAt: created, updatedAt: created.addingTimeInterval(60))
+        t.context.insert(exercise)
+        t.context.insert(workout)
+        t.context.insert(explicit)
+
+        #expect(exercise.defaultReps == nil)
+        #expect(exercise.defaultKg == nil)
+        #expect(exercise.defaultRestSeconds == nil)
+        #expect(workout.updatedAt == created)
+        #expect(explicit.updatedAt == created.addingTimeInterval(60))
+        #expect(explicit.createdAt == created)
+    }
+
+    @Test func newFieldsPersistAfterSaveAndFreshFetch() throws {
+        let t = try TestContainer()
+        let created = Date(timeIntervalSince1970: 1_000_000)
+        let updated = Date(timeIntervalSince1970: 2_000_000)
+        let exercise = Exercise(
+            name: "Row", muscleGroup: .back, defaultReps: 8, defaultKg: 22.5, defaultRestSeconds: 120)
+        let workout = Workout(name: "Pull", createdAt: created, updatedAt: updated)
+        t.context.insert(exercise)
+        t.context.insert(workout)
+        try t.context.save()
+
+        let freshContext = ModelContext(t.container)
+        let exerciseID = exercise.id
+        let workoutID = workout.id
+        let fetchedExercise = try #require(
+            try freshContext.fetch(FetchDescriptor<Exercise>(predicate: #Predicate { $0.id == exerciseID })).first)
+        let fetchedWorkout = try #require(
+            try freshContext.fetch(FetchDescriptor<Workout>(predicate: #Predicate { $0.id == workoutID })).first)
+        #expect(fetchedExercise.defaultReps == 8)
+        #expect(fetchedExercise.defaultKg == 22.5)
+        #expect(fetchedExercise.defaultRestSeconds == 120)
+        #expect(fetchedWorkout.createdAt == created)
+        #expect(fetchedWorkout.updatedAt == updated)
+    }
+
+    @Test func settingDefaultsBackToNilPersists() throws {
+        let t = try TestContainer()
+        let exercise = Exercise(
+            name: "Row", muscleGroup: .back, defaultReps: 8, defaultKg: 22.5, defaultRestSeconds: 120)
+        t.context.insert(exercise)
+        try t.context.save()
+
+        exercise.defaultReps = nil
+        exercise.defaultKg = nil
+        exercise.defaultRestSeconds = nil
+        try t.context.save()
+
+        let freshContext = ModelContext(t.container)
+        let exerciseID = exercise.id
+        let fetched = try #require(
+            try freshContext.fetch(FetchDescriptor<Exercise>(predicate: #Predicate { $0.id == exerciseID })).first)
+        #expect(fetched.defaultReps == nil)
+        #expect(fetched.defaultKg == nil)
+        #expect(fetched.defaultRestSeconds == nil)
+    }
+
     @Test func displayNamesAreNonEmptyAndMuscleGroupOrderMatchesSpec() {
         #expect(MuscleGroup.allCases.map(\.displayName) ==
             ["Chest", "Back", "Shoulders", "Biceps", "Triceps", "Legs", "Glutes", "Core", "Full body"])

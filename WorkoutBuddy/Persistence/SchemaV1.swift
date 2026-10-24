@@ -20,18 +20,28 @@ nonisolated enum SchemaV1: VersionedSchema {
         var muscleGroupRaw: String = MuscleGroup.fullBody.rawValue
         var isCustom: Bool = false
         var isArchived: Bool = false
+        /// Optional defaults for a new set of this exercise. `nil` means "not set".
+        var defaultReps: Int?
+        var defaultKg: Double?
+        var defaultRestSeconds: Int?
 
         var muscleGroup: MuscleGroup {
             get { MuscleGroup(rawValue: muscleGroupRaw) ?? .fullBody }
             set { muscleGroupRaw = newValue.rawValue }
         }
 
-        init(id: UUID = UUID(), name: String, muscleGroup: MuscleGroup, isCustom: Bool = false, isArchived: Bool = false) {
+        init(
+            id: UUID = UUID(), name: String, muscleGroup: MuscleGroup, isCustom: Bool = false, isArchived: Bool = false,
+            defaultReps: Int? = nil, defaultKg: Double? = nil, defaultRestSeconds: Int? = nil
+        ) {
             self.id = id
             self.name = name
             self.muscleGroupRaw = muscleGroup.rawValue
             self.isCustom = isCustom
             self.isArchived = isArchived
+            self.defaultReps = defaultReps
+            self.defaultKg = defaultKg
+            self.defaultRestSeconds = defaultRestSeconds
         }
     }
 
@@ -41,6 +51,8 @@ nonisolated enum SchemaV1: VersionedSchema {
         var id: UUID = UUID()
         var name: String = ""
         var createdAt: Date = Date.now
+        /// When the template was last saved through the editor. Decides which template counts as "last used".
+        var updatedAt: Date = Date.now
         var isSoftDeleted: Bool = false
 
         @Relationship(deleteRule: .cascade, inverse: \WorkoutExercise.workout)
@@ -53,10 +65,13 @@ nonisolated enum SchemaV1: VersionedSchema {
             exercises.sorted { $0.order < $1.order }
         }
 
-        init(id: UUID = UUID(), name: String, createdAt: Date = .now, isSoftDeleted: Bool = false) {
+        init(
+            id: UUID = UUID(), name: String, createdAt: Date = .now, updatedAt: Date? = nil, isSoftDeleted: Bool = false
+        ) {
             self.id = id
             self.name = name
             self.createdAt = createdAt
+            self.updatedAt = updatedAt ?? createdAt
             self.isSoftDeleted = isSoftDeleted
         }
     }
