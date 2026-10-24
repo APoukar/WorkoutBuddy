@@ -163,12 +163,12 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
   - `lastUsedFirstSet(forExerciseID:) throws -> SetValues?`: see the "values last used" decision. Fetch the active templates and filter in memory.
   - `firstSetValues(for exercise: Exercise, settings: AppSettings.Values) -> SetValues`: the full rule. A failed fetch falls back to skipping the "last used" source and is logged.
   - `lastPerformed(_ workout: Workout) -> Date?`: the latest `startedAt` among the template's sessions whose status is `completed` or `endedEarly`. Sessions in progress don't count.
-  - `canStart(_ workout: Workout) -> Bool`: the template has at least one exercise and every exercise has at least one set. (A per-reason enum isn't needed: the only way it fails in practice is a template emptied by deleting exercises.)
+  - `canStart(_ workout: Workout) -> Bool`: the template has at least one exercise and every exercise has at least one set. Rows whose `exercise` is `nil` are ignored, the same as in `draft(for:)` (step 5 review). (A per-reason enum isn't needed: the only way it fails in practice is a template emptied by deleting exercises.)
 - Tests:
-  - `resolve`: each value from each source, mixed sources (e.g. reps from the exercise, kg from last used, rest from Settings), and every source missing except Settings
+  - `resolve`: each value from each source, mixed sources (e.g. reps from the exercise with kg and rest from last used, or reps from the exercise with kg and rest from Settings; last used supplies all three values or none), and every source missing except Settings
   - `lastUsedFirstSet`, using fixed `now` dates through `save(_:to:now:)` or the `Workout` init: the most recently saved template wins over an older one; a soft-deleted template is ignored; a template saved again becomes the most recent; it takes the **first** set; the tie-break; `nil` when no active template has the exercise
   - `lastPerformed`: picks the latest finished session, ignores in-progress ones, and is `nil` with no sessions
-  - `canStart`: true for a valid template, false with no exercises
+  - `canStart`: true for a valid template, false with no exercises, false when the only row has no exercise
 - Also run the tests on iOS 18.2.
 
 **→ End of part A.** Do the part A manual check and the session hand-off described under "Workflow".

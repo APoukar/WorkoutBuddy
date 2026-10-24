@@ -133,6 +133,56 @@ struct WorkoutLibrary {
         return rows.contains { Set($0.sets.map(\.id)).count != $0.sets.count }
     }
 
+    // MARK: Queries
+
+    /// The first set of the exercise in the active template that was saved most recently
+    /// (`updatedAt`, then `createdAt`, then `id`; later or greater wins). A template whose row for the
+    /// exercise has no sets is skipped. `nil` when no active template qualifies.
+    func lastUsedFirstSet(forExerciseID exerciseID: UUID) throws -> SetValues? {
+        let active = try context.fetch(FetchDescriptor<Workout>(predicate: #Predicate { !$0.isSoftDeleted }))
+        let newestFirst = active.sorted { a, b in
+            if a.updatedAt != b.updatedAt { return a.updatedAt > b.updatedAt }
+            if a.createdAt != b.createdAt { return a.createdAt > b.createdAt }
+            return a.id.uuidString > b.id.uuidString
+        }
+        for workout in newestFirst {
+            let row = workout.orderedExercises.first { $0.exercise?.id == exerciseID }
+            if let first = row?.orderedSets.first {
+                return SetValues(reps: first.reps, kg: first.kg, restSeconds: first.restSeconds)
+            }
+        }
+        return nil
+    }
+
+    /// The values for the first set of `exercise` in a template: the exercise's own defaults, then the last
+    /// used set, then Settings, per value. A failed fetch skips the "last used" source and is logged.
+    func firstSetValues(for exercise: Exercise, settings: AppSettings.Values) -> SetValues {
+        let lastUsed: SetValues?
+        do {
+            lastUsed = try lastUsedFirstSet(forExerciseID: exercise.id)
+        } catch {
+            ErrorLogging.log(error, action: "Look up last used set", category: "workouts")
+            lastUsed = nil
+        }
+        return FirstSetDefaults.resolve(exercise: exercise.defaults, lastUsed: lastUsed, settings: settings)
+    }
+
+    /// The latest start of a finished (completed or ended early) session of the template.
+    /// Sessions in progress don't count. `nil` when there is none.
+    func lastPerformed(_ workout: Workout) -> Date? {
+        workout.sessions
+            .filter { $0.status == .completed || $0.status == .endedEarly }
+            .map(\.startedAt)
+            .max()
+    }
+
+    /// Whether the template can be started: at least one row with an exercise, and every such row has
+    /// at least one set. Rows whose exercise is missing (`nil`) are ignored, as in `draft(for:)`.
+    func canStart(_ workout: Workout) -> Bool {
+        let rows = workout.exercises.filter { $0.exercise != nil }
+        return !rows.isEmpty && rows.allSatisfy { !$0.sets.isEmpty }
+    }
+
     // MARK: Lookup and delete
 
     /// Lookup by ID. Deliberately does not filter out soft-deleted templates.
