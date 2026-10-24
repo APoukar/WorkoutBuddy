@@ -134,4 +134,43 @@ struct FormattersTests {
         #expect(AppSettings.snapKg(500.4) == 500)
         #expect(AppSettings.snapKg(0.25) == 0.5)
     }
+
+    // MARK: Workout duration and volume
+
+    @Test func durationFormatting() {
+        #expect(Formatters.duration(seconds: 45, locale: us) == "45 sec")
+        #expect(Formatters.duration(seconds: 0, locale: us) == "0 sec")
+        #expect(Formatters.duration(seconds: -5, locale: us) == "0 sec")
+        #expect(Formatters.duration(seconds: 59, locale: us) == "59 sec")
+        #expect(Formatters.duration(seconds: 60, locale: us) == "1 min")
+        #expect(Formatters.duration(seconds: 12 * 60 + 40, locale: us) == "12 min")
+        #expect(Formatters.duration(seconds: 3600, locale: us) == "1 hr")
+        #expect(Formatters.duration(seconds: 3900, locale: us) == "1 hr, 5 min")
+        #expect(Formatters.duration(seconds: 3600 + 5 * 60 + 59, locale: us) == "1 hr, 5 min")
+        #expect(Formatters.duration(seconds: 3599, locale: us) == "59 min")
+        #expect(Formatters.duration(seconds: 2 * 3600 + 30 * 60, locale: us) == "2 hr, 30 min")
+    }
+
+    @Test func spokenWorkoutDurationFormatting() {
+        #expect(Formatters.spokenWorkoutDuration(seconds: 45, locale: us) == "45 seconds")
+        #expect(Formatters.spokenWorkoutDuration(seconds: 1, locale: us) == "1 second")
+        #expect(Formatters.spokenWorkoutDuration(seconds: 3900, locale: us) == "1 hour, 5 minutes")
+        #expect(Formatters.spokenWorkoutDuration(seconds: 60, locale: us) == "1 minute")
+        #expect(Formatters.spokenWorkoutDuration(seconds: 7200, locale: us) == "2 hours")
+    }
+
+    @Test func volumeFormatting() {
+        #expect(Formatters.volume(4250, locale: us) == "4,250\u{00A0}kg")
+        #expect(Formatters.volume(4250, locale: enCZ) == "4\u{00A0}250\u{00A0}kg")
+        #expect(Formatters.volume(157.5, locale: us) == "157.5\u{00A0}kg")
+        #expect(Formatters.volume(157.5, locale: enCZ) == "157,5\u{00A0}kg")
+        #expect(Formatters.volume(0, locale: us) == "0\u{00A0}kg")
+    }
+
+    @Test func spokenVolumeFormatting() {
+        #expect(Formatters.spokenVolume(4250, locale: us) == "4,250 kilograms")
+        #expect(Formatters.spokenVolume(1, locale: us) == "1 kilogram")
+        #expect(Formatters.spokenVolume(0, locale: us) == "0 kilograms")
+        #expect(Formatters.spokenVolume(157.5, locale: enCZ) == "157,5 kilograms")
+    }
 }

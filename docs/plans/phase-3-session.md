@@ -110,14 +110,14 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
 - `Features/Session/SessionMessages.swift` (`nonisolated`), every text with a spoken form where it's read differently:
   - positions: "Exercise 2 of 5", "Set 3 of 4"
   - the "Next" preview on the set screen: "Next: Set 4 · 10 × 60 kg" within the same exercise, "Next: Overhead Press · 8 × 40 kg" for the next exercise (the name is passed in; names are looked up by the caller), "Last set" when none is left. Uses `SetSummary.line`, so 0 kg reads "Bodyweight".
-  - the rest screen's "Up next" line, with the same name rule.
+  - the rest screen's "Up next" line, which always names the exercise (the rest screen has no exercise title): "Bench Press · Set 2 · 8 × 62.5 kg".
   - summary: title ("Workout Complete" / "Workout Ended"), set counts ("8 completed", "1 skipped", "3 not performed") with correct singulars, using `Formatters.duration` and `Formatters.volume`. For a workout with no done set, the note above the Discard button: "No sets were completed, so this workout can't be saved."
   - confirmations: "End Workout?" and "Discard Workout?" titles and messages, the recovery alert title and message ("“Push Day” was still in progress.", the name passed in by the caller from the reference, soft-deleted or not; "Your workout was still in progress." when there's no name).
   - `failureMessage(for:)` mapping `SessionError` (step 3) and other errors (`ErrorMessages.generic`).
 - Tests: every text, singulars, 0 kg and Bodyweight, `en_US` and `en_CZ` for numbers (the volume grouping and decimal separator), and the stats, including volume with Bodyweight sets (0) and ignoring skipped and not-performed sets.
 
 **Step 3 — `SessionLibrary`: start, active session and the set actions**
-- `Features/Session/SessionLibrary.swift`, `SessionError: Error, Equatable` with `.alreadyActive`, `.cannotStart`.
+- `Features/Session/SessionLibrary.swift`. It uses `SessionError` (`.alreadyActive`, `.cannotStart`) from `Features/Session/SessionError.swift`, which step 2 created; don't declare it again.
 - `activeSession() throws -> WorkoutSession?`: the session with status `inProgress` (raw-string predicate). If several exist (only possible through a bug), the newest `startedAt` wins and the result is logged.
 - `snapshot(of:) -> SessionSnapshot`, built from `orderedExercises` / `orderedSets`.
 - `start(_ workout: Workout, now:) throws -> WorkoutSession`: refuses `.alreadyActive` and `.cannotStart` (soft-deleted, or `!WorkoutLibrary.canStart`) before changing anything; inserts the session, its `SessionExercise`s (rows with an exercise only, renumbered from 0) and `SessionSet`s with the planned numbers copied and status `pending`; saves once.
@@ -242,3 +242,9 @@ The user was asleep, so the main session settled these. Each can be revisited.
 1. All sets resolved but no `endedAt` (bad data only) would leave Resume → a summary whose Save does nothing → **accepted** into step 4: recovery shows the summary and `save` sets `endedAt = lastActivity`.
 2. `SessionScreen.rest` changes every second → **accepted** into step 7: key transitions and tasks on a stable screen key and `restEndsAt`.
 3. `FEATURES.md` §4 didn't list the new fields → **updated** §4 with `pausedAt`, `restEndsAt` and the "resolved at" meaning of `completedAt` (wording only, no behaviour change).
+
+**Step 2 code review, verdict "Approve with fixes", 4 findings** (plus the implementer's deviations, accepted: `SessionError` defined in step 2 in its own file because `failureMessage` needs it; `SessionStats.init(_:now:)`; volume falls back to planned values for a done set without actual values, bad data only):
+1. The rest screen's "Up next" dropped the exercise name within an exercise → **accepted**: it always names the exercise and the set ("Bench Press · Set 2 · 8 × 62.5 kg"); the set screen's "Next" keeps its rule.
+2. The `.cannotStart` text advised adding an exercise, also for a deleted template → **accepted**: neutral "This workout can't be started."
+3. Step 3 still said it defines `SessionError` → **accepted**: plan updated.
+4. `duration` and `spokenDuration` look like a pair but aren't → **accepted**: cross-referencing doc comments, no rename.
