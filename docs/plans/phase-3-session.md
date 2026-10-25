@@ -287,3 +287,8 @@ The user was asleep, so the main session settled these. Each can be revisited.
 5. The expired-rest rule was written twice → **accepted**: `perform` uses `hasExpiredRest`.
 6. A failed fetch made actions silently do nothing → **accepted**: logged and shown.
 7. **Question for the user:** an all-skipped workout's summary said "Workout Complete" over "0 completed" and a Discard button → **decided**: "Workout Ended" whenever the workout can't be saved. Easy to change.
+
+**Step 8 code review, verdict "Request changes", 3 findings.** The reviewer ran the real app on iOS 27 and 18.2, starting workouts and killing the app with `simctl terminate`: Start opens the cover; after a kill the recovery alert shows with no flash of the cover; Resume returns to the right screen; End & Save saves as ended early at the last activity and the list shows "Last done" today; a kill with no done set offers Discard; a kill on the summary brings the summary back without asking.
+1. [Blocker] The Discard variant of the recovery alert got an automatic Cancel button that left the workout stranded behind a cover that never showed → **accepted**: Resume has the cancel role and the alert is driven by the recovery state, so any dismissal means Resume.
+2. [Major] A second Start tap while the cover was presenting raised an alert under it that knocked the cover away → **accepted**: `.alreadyActive` is ignored in the detail screen (the cover already shows the workout).
+3. [Minor] A failed End & Save or Discard during recovery showed the error at the same moment the cover presented → **accepted**: the recovery question stays and comes back after the error alert.

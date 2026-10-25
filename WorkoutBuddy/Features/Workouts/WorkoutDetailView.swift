@@ -13,6 +13,7 @@ struct WorkoutDetailView: View {
     /// Set by the editor when it deleted the template. Checked when the sheet has dismissed, so the pop
     /// happens once, after the sheet is gone, not underneath it.
     @State private var deletedInEditor = false
+    @State private var error: Error?
 
     private var library: WorkoutLibrary { WorkoutLibrary(context: context) }
 
@@ -45,13 +46,13 @@ struct WorkoutDetailView: View {
         }
         .bottomActionBar {
             Button {
-                // Starting a session comes in phase 3.
+                start()
             } label: {
                 Text("Start Workout").frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .disabled(!canStart)
+            .disabled(!WorkoutDetailRules.isStartEnabled(canStart: canStart, isSoftDeleted: workout.isSoftDeleted))
             if !canStart {
                 Text(WorkoutDetailRules.cannotStartHint)
                     .font(.footnote)
@@ -66,6 +67,7 @@ struct WorkoutDetailView: View {
                 Button("Edit") { editing = true }
             }
         }
+        .errorAlert($error, message: SessionMessages.failureMessage(for:))
         .sheet(isPresented: $editing, onDismiss: editorDismissed) {
             WorkoutEditorView(workout: workout, onDeleted: { deletedInEditor = true })
         }
@@ -101,6 +103,21 @@ struct WorkoutDetailView: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(WorkoutDetailRules.setAccessibilityLabel(forSetAt: index, values: values))
+    }
+
+    /// Starts a session. The full-screen session follows from the store (`RootTabView`), so there's nothing
+    /// to present here.
+    private func start() {
+        do {
+            try SessionLibrary(context: context).start(workout)
+        } catch SessionError.alreadyActive {
+            // A second tap while the session is opening. An alert here would knock the full-screen
+            // session away, so it's logged only.
+            ErrorLogging.log(SessionError.alreadyActive, action: "Start workout (already active)", category: "session")
+        } catch {
+            ErrorLogging.log(error, action: "Start workout", category: "session")
+            self.error = error
+        }
     }
 
     private func editorDismissed() {

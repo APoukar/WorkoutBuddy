@@ -27,4 +27,11 @@ struct WorkoutDetailRulesTests {
     @Test func hintTellsWhatToDo() {
         #expect(WorkoutDetailRules.cannotStartHint == "Add an exercise to start this workout.")
     }
+
+    @Test func startNeedsAStartableActiveTemplate() {
+        #expect(WorkoutDetailRules.isStartEnabled(canStart: true, isSoftDeleted: false))
+        #expect(!WorkoutDetailRules.isStartEnabled(canStart: false, isSoftDeleted: false))
+        #expect(!WorkoutDetailRules.isStartEnabled(canStart: true, isSoftDeleted: true))
+        #expect(!WorkoutDetailRules.isStartEnabled(canStart: false, isSoftDeleted: true))
+    }
 }
