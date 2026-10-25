@@ -13,21 +13,30 @@ Scheme `WorkoutBuddy`, project `WorkoutBuddy.xcodeproj`. There is no linter conf
 xcodebuild build -project WorkoutBuddy.xcodeproj -scheme WorkoutBuddy -destination 'platform=iOS Simulator,name=iPhone 17,OS=27.0' -quiet
 
 # Run all unit tests
-xcodebuild test -project WorkoutBuddy.xcodeproj -scheme WorkoutBuddy -destination 'platform=iOS Simulator,name=iPhone 17,OS=27.0' -quiet
+xcodebuild test -project WorkoutBuddy.xcodeproj -scheme WorkoutBuddy -destination 'platform=iOS Simulator,name=iPhone 17,OS=27.0' -quiet -only-testing:WorkoutBuddyTests
 
 # Run one suite or one test
 xcodebuild test -project WorkoutBuddy.xcodeproj -scheme WorkoutBuddy -destination 'platform=iOS Simulator,name=iPhone 17,OS=27.0' -quiet -only-testing:WorkoutBuddyTests/<SuiteName>/<testName()>
+
+# Run the UI tests
+xcodebuild test -project WorkoutBuddy.xcodeproj -scheme WorkoutBuddy -destination 'platform=iOS Simulator,name=iPhone 17,OS=27.0' -quiet -only-testing:WorkoutBuddyUITests
+
+# Check one UI test class for flakiness (stops at the first failure)
+xcodebuild test -project WorkoutBuddy.xcodeproj -scheme WorkoutBuddy -destination 'platform=iOS Simulator,name=iPhone 17,OS=27.0' -quiet -only-testing:WorkoutBuddyUITests/<ClassName> -test-iterations 3 -run-tests-until-failure
 ```
 
-To check behaviour on the minimum OS, use `-destination 'platform=iOS Simulator,name=iPhone 16,OS=18.2'`.
+To check behaviour on the minimum OS, use `-destination 'platform=iOS Simulator,name=iPhone 16,OS=18.2'`, with `-parallel-testing-enabled NO` (otherwise cloning the simulator sometimes fails).
 
-**CI:** `.github/workflows/ci.yml` builds the app (Debug, plus a Release build to catch code that only compiles in Debug) and runs all unit tests on every pull request and every push to `main`. It runs on GitHub's `xcode-27` runner, using iPhone 17 on the latest iOS simulator. CI doesn't test on iOS 18, so the minimum-OS check above is still done locally. If a test fails, the `.xcresult` bundle is uploaded as a run artifact.
+A plain `xcodebuild test` without `-only-testing` runs both the unit and the UI tests. The UI tests take minutes, so run them for steps that touch views or the UI tests themselves; the code reviewer runs them on both OS versions. Count tests from the `.xcresult` (`xcrun xcresulttool get test-results summary --path <bundle>`), not the console log.
+
+**CI:** `.github/workflows/ci.yml` builds the app (Debug, plus a Release build to catch code that only compiles in Debug) and runs all unit tests (and, since the UI test target joined the scheme, the UI tests) on every pull request and every push to `main`. It runs on GitHub's `xcode-27` runner, using iPhone 17 on the latest iOS simulator. CI doesn't test on iOS 18, so the minimum-OS check above is still done locally. If a test fails, the `.xcresult` bundle is uploaded as a run artifact.
 
 ## Project setup
-- Targets: `WorkoutBuddy` (app, `net.poukar.WorkoutBuddy`) and `WorkoutBuddyTests` (unit tests, hosted in the app). A widget extension for the Live Activity comes in phase 4.
-- `WorkoutBuddy/` and `WorkoutBuddyTests/` are **synchronized folders**: any file added under them joins the target automatically. Don't edit `project.pbxproj` to add files.
-- Both targets use Swift 6 language mode with **default actor isolation set to `MainActor`** and Approachable Concurrency. Types and functions are `@MainActor` unless marked `nonisolated`; mark pure logic `nonisolated` when it must run off the main actor.
+- Targets: `WorkoutBuddy` (app, `net.poukar.WorkoutBuddy`), `WorkoutBuddyTests` (unit tests, hosted in the app) and `WorkoutBuddyUITests` (XCUITest UI tests, not parallelized; see `docs/plans/ui-tests.md`). A widget extension for the Live Activity comes in phase 4.
+- `WorkoutBuddy/`, `WorkoutBuddyTests/` and `WorkoutBuddyUITests/` are **synchronized folders**: any file added under them joins the target automatically. `UITestingContract/` is a synchronized folder in **both** the app and the UI test target, for names both sides need (launch arguments, scenarios, accessibility identifiers). Don't edit `project.pbxproj` to add files.
+- All three targets use Swift 6 language mode with **default actor isolation set to `MainActor`** and Approachable Concurrency. Types and functions are `@MainActor` unless marked `nonisolated`; mark pure logic `nonisolated` when it must run off the main actor.
 - Unit tests use Swift Testing (`import Testing`, `@Test`, `#expect`). SwiftData tests use an in-memory `ModelContainer`.
+- UI tests use XCTest (`XCUIApplication` needs `XCTestCase`). Test classes are `nonisolated` (the `XCTestCase` initializers and `setUp` are), and the test methods are `@MainActor`.
 - Portrait only. Any API newer than iOS 18 needs `if #available` with an iOS 18 fallback.
 
 ## Rules that span the whole app
