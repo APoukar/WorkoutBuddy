@@ -14,6 +14,25 @@ extension XCUIApplication {
     var pausedLayer: XCUIElement { layer(UITestingContract.Identifier.paused) }
     var summaryLayer: XCUIElement { layer(UITestingContract.Identifier.summary) }
 
+    /// The summary's Volume element (label "Volume", value like "1,420 kilograms").
+    var summaryVolume: XCUIElement {
+        summaryLayer.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", UITestingContract.Spoken.volumeLabel)).firstMatch
+    }
+
+    /// Pause from the given screen (set or rest), check the paused layer offers Resume and End Workout, then
+    /// Resume and wait until the layer is gone.
+    func pauseAndResume(from screen: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+        screen.buttons["Pause"].tap()
+        XCTAssertTrue(pausedLayer.waitForExistence(timeout: defaultTimeout), "no paused overlay", file: file, line: line)
+        XCTAssertTrue(pausedLayer.buttons["Resume"].exists, "no Resume", file: file, line: line)
+        XCTAssertTrue(
+            pausedLayer.buttons[UITestingContract.Identifier.pausedEndWorkout].exists, "no End Workout",
+            file: file, line: line)
+        pausedLayer.buttons["Resume"].tap()
+        XCTAssertTrue(pausedLayer.waitForNonExistence(), "the paused overlay didn't close", file: file, line: line)
+    }
+
     /// Taps Start Workout on the open template and waits for the first set screen.
     func startWorkout(named name: String) {
         buttons[name].tap()

@@ -38,8 +38,7 @@ nonisolated final class SessionFlowUITests: XCTestCase {
         app.assertSummary(title: UITestingContract.Spoken.workoutComplete)
         XCTAssertTrue(app.summaryLayer.staticTexts[UITestingContract.Spoken.setsCompleted(3)].exists)
         // Also proves the English region applied: "1,420", not "1 420".
-        let volume = app.summaryLayer.descendants(matching: .any)
-            .matching(NSPredicate(format: "label == %@", UITestingContract.Spoken.volumeLabel)).firstMatch
+        let volume = app.summaryVolume
         XCTAssertTrue(volume.exists)
         XCTAssertEqual(volume.value as? String, UITestingContract.Spoken.plannedVolume)
 
@@ -91,5 +90,134 @@ nonisolated final class SessionFlowUITests: XCTestCase {
         app.cancelConfirmation(label: "End Workout", excluding: UITestingContract.Identifier.pausedEndWorkout)
         XCTAssertTrue(app.pausedLayer.exists)
         XCTAssertTrue(app.pausedLayer.buttons["Resume"].exists)
+    }
+
+    // MARK: Set actions, rest actions and pause
+
+    /// − / + on reps and kg, then a typed kg value, each saved by Done. Merged into one launch: the buttons
+    /// on the first set, the keyboard on the second. The summary volume proves what was saved:
+    /// 11 × 62.5 + 8 × 57.5 + 8 × 40 = 687.5 + 460 + 320.
+    @MainActor
+    func testAdjustedAndTypedValuesAreSavedByDone() {
+        let app = launch(scenario: UITestingContract.Scenario.templates)
+        app.startWorkout(named: UITestingContract.Workout.longRests)
+        app.assertSetScreen(
+            exercise: "Bench Press",
+            position: UITestingContract.Spoken.position(exercise: 1, of: 2, set: 1, of: 2))
+
+        // First set: planned 10 × 60. Reps 10 + 1 + 1 - 1 = 11, kg 60 + 2.5 = 62.5 (the default step).
+        let reps = ValueControl(identifier: UITestingContract.Identifier.repsControl, in: app.setScreen)
+        let kg = ValueControl(identifier: UITestingContract.Identifier.kgControl, in: app.setScreen)
+        XCTAssertEqual(reps.value, "10")
+        XCTAssertEqual(kg.value, "60 kilograms")
+        reps.increment()
+        reps.increment()
+        reps.decrement()
+        kg.increment()
+        XCTAssertEqual(reps.value, "11")
+        XCTAssertEqual(kg.value, "62.5 kilograms")
+        app.setScreen.buttons[UITestingContract.Identifier.setDone].tap()
+        app.assertRestScreen()
+        app.restScreen.buttons["Skip Rest"].tap()
+
+        // Second set: planned 8 × 62.5, typed 57.5.
+        app.assertSetScreen(
+            exercise: "Bench Press",
+            position: UITestingContract.Spoken.position(exercise: 1, of: 2, set: 2, of: 2))
+        let kg2 = ValueControl(identifier: UITestingContract.Identifier.kgControl, in: app.setScreen)
+        XCTAssertEqual(kg2.value, "62.5 kilograms")
+        kg2.focusField()
+        app.dismissKeyboardIntroductionIfPresent()
+        kg2.field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8) + "57.5")
+        let keyboardDone = app.toolbars.buttons["Done"]
+        XCTAssertTrue(keyboardDone.waitForExistence(timeout: defaultTimeout), "no keyboard Done bar")
+        keyboardDone.tap()
+        XCTAssertTrue(keyboardDone.waitForNonExistence(), "the keyboard didn't close")
+        XCTAssertEqual(kg2.value, "57.5 kilograms")
+        app.setScreen.buttons[UITestingContract.Identifier.setDone].tap()
+
+        // "Long Rests" rests after every set, so the last Bench Press set is followed by a rest; then
+        // Overhead Press opens, done as planned.
+        app.assertRestScreen()
+        app.restScreen.buttons["Skip Rest"].tap()
+        app.assertSetScreen(
+            exercise: "Overhead Press",
+            position: UITestingContract.Spoken.position(exercise: 2, of: 2, set: 1, of: 1))
+        app.setScreen.buttons[UITestingContract.Identifier.setDone].tap()
+
+        app.assertSummary(title: UITestingContract.Spoken.workoutComplete)
+        let volume = app.summaryVolume
+        XCTAssertTrue(volume.exists)
+        XCTAssertEqual(volume.value as? String, "1,467.5 kilograms")
+    }
+
+    /// Skip Set goes straight to the next set (no rest screen), and Pause / Resume on the set screen.
+    /// Merged into one launch: the pause check runs on the set the skip opened.
+    @MainActor
+    func testSkipSetSkipsRestAndPauseResumesOnSetScreen() {
+        let app = launch(scenario: UITestingContract.Scenario.templates)
+        app.startWorkout(named: UITestingContract.Workout.longRests)
+        app.assertSetScreen(
+            exercise: "Bench Press",
+            position: UITestingContract.Spoken.position(exercise: 1, of: 2, set: 1, of: 2))
+
+        app.setScreen.buttons["Skip Set"].tap()
+        app.assertSetScreen(
+            exercise: "Bench Press",
+            position: UITestingContract.Spoken.position(exercise: 1, of: 2, set: 2, of: 2))
+        XCTAssertFalse(app.restScreen.exists, "Skip Set opened a rest screen")
+
+        app.pauseAndResume(from: app.setScreen)
+        app.assertSetScreen(
+            exercise: "Bench Press",
+            position: UITestingContract.Spoken.position(exercise: 1, of: 2, set: 2, of: 2))
+    }
+
+    /// Done opens the rest screen naming the next set; Pause / Resume there leaves it in place; Undo returns to
+    /// the first set with the reps entered before Done; Done again and Skip Rest open the second set.
+    /// Merged into one launch: all four steps are one flow on the same rest.
+    @MainActor
+    func testRestScreenUpNextPauseUndoAndSkipRest() {
+        let app = launch(scenario: UITestingContract.Scenario.templates)
+        app.startWorkout(named: UITestingContract.Workout.longRests)
+        app.assertSetScreen(
+            exercise: "Bench Press",
+            position: UITestingContract.Spoken.position(exercise: 1, of: 2, set: 1, of: 2))
+        let reps = ValueControl(identifier: UITestingContract.Identifier.repsControl, in: app.setScreen)
+        let kg = ValueControl(identifier: UITestingContract.Identifier.kgControl, in: app.setScreen)
+        reps.increment()
+        kg.increment()
+        XCTAssertEqual(reps.value, "11")
+        XCTAssertEqual(kg.value, "62.5 kilograms")
+        app.setScreen.buttons[UITestingContract.Identifier.setDone].tap()
+
+        app.assertRestScreen()
+        let upNext = app.restScreen.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", UITestingContract.Spoken.upNextLabel)).firstMatch
+        XCTAssertTrue(upNext.waitForExistence(timeout: defaultTimeout), "no Up next")
+        XCTAssertEqual(upNext.value as? String, UITestingContract.Spoken.longRestsUpNextSet2)
+
+        // Pause on the rest screen, then Resume: the rest screen is still there.
+        app.pauseAndResume(from: app.restScreen)
+        app.assertRestScreen()
+
+        // Undo: the first set again, with the 11 reps entered before Done.
+        app.restScreen.buttons["Undo"].tap()
+        app.assertSetScreen(
+            exercise: "Bench Press",
+            position: UITestingContract.Spoken.position(exercise: 1, of: 2, set: 1, of: 2))
+        XCTAssertFalse(app.restScreen.exists)
+        let repsAfterUndo = ValueControl(identifier: UITestingContract.Identifier.repsControl, in: app.setScreen)
+        let kgAfterUndo = ValueControl(identifier: UITestingContract.Identifier.kgControl, in: app.setScreen)
+        XCTAssertEqual(repsAfterUndo.value, "11")
+        XCTAssertEqual(kgAfterUndo.value, "62.5 kilograms")
+
+        app.setScreen.buttons[UITestingContract.Identifier.setDone].tap()
+        app.assertRestScreen()
+        app.restScreen.buttons["Skip Rest"].tap()
+        app.assertSetScreen(
+            exercise: "Bench Press",
+            position: UITestingContract.Spoken.position(exercise: 1, of: 2, set: 2, of: 2))
+        XCTAssertFalse(app.restScreen.exists)
     }
 }

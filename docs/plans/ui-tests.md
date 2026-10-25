@@ -192,3 +192,9 @@ As in `CLAUDE.md`, with the findings discussed with the user before anything cha
 3. The value helper could tap while the control was still under the bottom bar → **accepted**: it asserts the control is clear first.
 4. The dialog-cancel helper didn't check the dialog closed, and waited 2 s on iOS 26+ → **accepted**: it asserts the dialog is gone and doesn't wait for a Cancel that doesn't exist. Proved by a new test, `SessionFlowUITests.testCancelConfirmationKeepsWorkoutPaused`, kept so the iOS 26+ popover path stays covered.
 5. The reps + button overlaps the bottom bar on iPhone 17 → **user's decision**: noted for the UI tidying session (Hooks above, and `phase-3-session.md`).
+
+**Step 4 code review (2026-10-25), verdict "Approve with fixes", 4 minor findings, discussed with the user; all accepted** (plus the implementer's merges, accepted: the step 4 cases are three tests — adjusted and typed values proved by the summary volume, 1,467.5 kg; Skip Set with set-screen Pause/Resume; the rest screen's Up next, Pause/Resume, Undo and Skip Rest — to save launches of 30–40 s each):
+1. Undo only proved the reps came back → the kg is changed too and checked after Undo.
+2. Repeated summary-volume lookup and pause/resume code → shared helpers in `Support/Screens.swift`; the identifier aliases removed.
+3. The Up next check was a prefix match → the exact spoken value, kept in the contract file.
+4. The keyboard-introduction check waited and collected debug information on every run → checked without a failing wait, after a (succeeding) wait for the keyboard: without that wait one iOS 18.2 run typed "57" instead of "57.5" (a lost keystroke while the keyboard settled); watch for it in later runs. The adjusted-values test takes about 75–95 s on iOS 27 here; step 8 uses this for the CI timing.

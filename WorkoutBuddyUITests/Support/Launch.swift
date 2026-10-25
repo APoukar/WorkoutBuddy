@@ -22,10 +22,14 @@ func launch(
 
 extension XCUIApplication {
     /// The "Speed up your typing" introduction on a fresh simulator can cover the keyboard. Best effort: tap
-    /// its Continue button if it shows up within a moment, do nothing otherwise.
+    /// its Continue button if it is there when called (the keyboard is already up), do nothing otherwise. A
+    /// plain `exists` check, not a wait: a failed wait makes XCUITest collect debug information every time.
     func dismissKeyboardIntroductionIfPresent() {
+        // Waits for the keyboard itself (this wait succeeds, so it collects no debug information) and then
+        // looks for the introduction; typing right after the tap, before the keyboard settled, lost characters.
+        _ = keyboards.firstMatch.waitForExistence(timeout: defaultTimeout)
         let continueButton = keyboards.buttons["Continue"]
-        if continueButton.waitForExistence(timeout: 1) { continueButton.tap() }
+        if continueButton.exists { continueButton.tap() }
     }
 }
 

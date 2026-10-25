@@ -77,6 +77,8 @@ nonisolated enum UITestingContract {
         /// The summary count line, "3 sets completed" or "1 set completed".
         static func setsCompleted(_ count: Int) -> String { "\(count) \(count == 1 ? "set" : "sets") completed" }
         static let upNextLabel = "Up next"
+        /// The "Up next" value on the rest screen after the first "Long Rests" set: the plan of Bench Press set 2.
+        static let longRestsUpNextSet2 = "Bench Press, set 2, 8 reps at 62.5 kilograms"
         static let repsLabel = "Reps"
         static let weightLabel = "Weight"
         static let workoutComplete = "Workout Complete"
