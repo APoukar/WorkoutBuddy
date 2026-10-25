@@ -263,3 +263,8 @@ The user was asleep, so the main session settled these. Each can be revisited.
 4. Duplicated save/rollback code and test fixture → **accepted**: `commit` reused; shared `SessionFixture` for the session tests.
    - Follow-on (main session): every call that reaches `perform` stamps `lastActionAt`, including no-op taps (a stale ID, Done while paused). A tap still shows the user was there, so that's accepted; the "changes nothing" tests compare snapshots without `lastActionAt`.
 5. End & Save on the bad-data case untested → **accepted**: test added; it saves as `completed`, because no set is left pending (only a caller bug reaches it; recovery shows the summary there).
+
+**Step 5 code review, verdict "Approve with fixes", 3 minor findings** (plus the implementer's deviation, **accepted**: a shared `LargeValueControlLayout` for the two large controls). The reviewer rendered the controls in a scratch demo app on iOS 27 (default, XXXL, AX5) and iOS 18.2 (dark): nothing clips, "127,5" fits, the buttons move under the value at AX sizes.
+1. The tested `Formatters.needsTextRewrite` was dead code and the rule the app runs was untested → **accepted**: the rule moved into `NumericTextEditing` and its existing tests now target it (an existing test changed, against the plan's "unchanged"; logged here), plus reps cases.
+2. Font tests passed regardless of the code → **accepted**: exact sizes at given content sizes, rounded design and monospaced digits checked.
+3. VoiceOver read "bodyweight" while the large kg control showed "0" → **accepted**: editing controls say "0 kilograms" (new `Formatters.spokenKilograms`, also used by `WeightField`, fixing its "1 kilograms").

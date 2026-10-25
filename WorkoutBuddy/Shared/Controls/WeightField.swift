@@ -10,7 +10,6 @@ struct WeightField: View {
 
     @AppStorage(AppSettings.Key.weightStep) private var stepRaw = AppSettings.Default.weightStep.rawValue
     @State private var text = ""
-    @State private var valueAtFocus = 0.0
     @State private var isFocused = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -44,30 +43,17 @@ struct WeightField: View {
                 Stepper(label, value: snappedKg, in: AppSettings.kgRange, step: step.kg)
                     .labelsHidden()
                     .accessibilityLabel(label)
-                    .accessibilityValue("\(Formatters.kg(kg)) kilograms")
+                    .accessibilityValue(Formatters.spokenKilograms(kg))
             }
         }
-        .onAppear { text = Formatters.kg(kg) }
-        .onChange(of: text) { _, newText in
-            guard isFocused else { return }
-            // Empty or unparseable text restores the value from when editing began.
-            let value = Formatters.committedKg(text: newText, current: valueAtFocus)
-            if value != kg { kg = value }
-        }
-        .onChange(of: kg) { _, newValue in
-            // Outside change (or stepper): refresh the text unless it already stands for this value.
-            if Formatters.needsTextRewrite(text: text, value: newValue, valueAtFocus: valueAtFocus) {
-                text = Formatters.kg(newValue)
-            }
-        }
-        .onChange(of: isFocused) { _, focused in
-            if focused {
-                valueAtFocus = AppSettings.snapKg(kg)
-            } else {
-                // On focus loss reformat from the binding.
-                text = Formatters.kg(kg)
-            }
-        }
+        .numericTextEditing(
+            value: $kg,
+            text: $text,
+            isFocused: $isFocused,
+            commit: { Formatters.committedKg(text: $0, current: $1) },
+            format: { Formatters.kg($0) },
+            normalize: AppSettings.snapKg
+        )
     }
 }
 

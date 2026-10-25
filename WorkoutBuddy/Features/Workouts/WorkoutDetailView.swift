@@ -43,7 +43,22 @@ struct WorkoutDetailView: View {
                 }
             }
         }
-        .startBar(canStart: canStart)
+        .bottomActionBar {
+            Button {
+                // Starting a session comes in phase 3.
+            } label: {
+                Text("Start Workout").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(!canStart)
+            if !canStart {
+                Text(WorkoutDetailRules.cannotStartHint)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+        }
         .navigationTitle(workout.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -93,45 +108,6 @@ struct WorkoutDetailView: View {
         deletedInEditor = false
         onDeleted()
     }
-}
-
-/// Pins the Start Workout button at the bottom. From iOS 26 the system bar and its scroll-edge effect are used;
-/// before that, a button over a `.bar` background keeps scrolling rows from showing through.
-private struct StartBar: ViewModifier {
-    let canStart: Bool
-
-    func body(content: Content) -> some View {
-        if #available(iOS 26, *) {
-            content.safeAreaBar(edge: .bottom, spacing: 0) { bar }
-        } else {
-            content.safeAreaInset(edge: .bottom, spacing: 0) { bar.background(.bar) }
-        }
-    }
-
-    private var bar: some View {
-        VStack(spacing: 8) {
-            Button {
-                // Starting a session comes in phase 3.
-            } label: {
-                Text("Start Workout").frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(!canStart)
-            if !canStart {
-                Text(WorkoutDetailRules.cannotStartHint)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-        }
-        .padding()
-        .frame(maxWidth: .infinity)
-    }
-}
-
-private extension View {
-    func startBar(canStart: Bool) -> some View { modifier(StartBar(canStart: canStart)) }
 }
 
 private struct DetailPreview: View {

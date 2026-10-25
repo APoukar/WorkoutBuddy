@@ -52,6 +52,12 @@ nonisolated enum Formatters {
 
     /// Spoken form for VoiceOver: "4,250 kilograms", "1 kilogram", "0 kilograms".
     static func spokenVolume(_ kg: Double, locale: Locale = .current) -> String {
+        spokenKilograms(kg, locale: locale)
+    }
+
+    /// A kg amount read out, with no Bodyweight substitution (for editing controls and totals):
+    /// "0 kilograms", "1 kilogram", "22.5 kilograms". Use `spokenWeight` for a set's weight.
+    static func spokenKilograms(_ kg: Double, locale: Locale = .current) -> String {
         "\(Formatters.kg(kg, locale: locale)) \(kg == 1 ? "kilogram" : "kilograms")"
     }
 
@@ -97,10 +103,17 @@ nonisolated enum Formatters {
         snappedKg(from: text) ?? current
     }
 
-    /// Whether a kg text field's text must be rewritten after its value changed to `value`.
-    /// Text that already stands for the value (using the `committedKg` rule, where empty or
-    /// invalid text stands for `valueAtFocus`) is left alone so typing isn't disturbed.
-    static func needsTextRewrite(text: String, value: Double, valueAtFocus: Double) -> Bool {
-        committedKg(text: text, current: valueAtFocus) != value
+    /// Parses user-typed reps text: ASCII digits only, so no sign, separator or grouping. Surrounding
+    /// whitespace is ignored. Nil for empty text, anything else, or a number too large for `Int`.
+    static func parseReps(_ text: String) -> Int? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.allSatisfy({ $0.isASCII && $0.isNumber }) else { return nil }
+        return Int(trimmed)
+    }
+
+    /// The value a reps text field commits: the parsed text clamped to `AppSettings.repsRange`, or
+    /// `current` if it doesn't parse.
+    static func committedReps(text: String, current: Int) -> Int {
+        parseReps(text).map(AppSettings.clampReps) ?? current
     }
 }
