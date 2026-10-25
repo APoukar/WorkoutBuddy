@@ -7,6 +7,10 @@ import Foundation
 nonisolated struct UITestingLaunch: Equatable, Sendable {
     enum Scenario: String, Sendable {
         case empty
+        case templates
+        case inProgress
+        case nothingDone
+        case onSummary
     }
 
     enum Store: String, Sendable {
@@ -18,6 +22,9 @@ nonisolated struct UITestingLaunch: Equatable, Sendable {
     var store: Store = .memory
     /// Keeps the disk store and the settings suite from the previous launch, and seeds no scenario.
     var keepData = false
+
+    /// Scenarios go only into a fresh store: with keep data the previous launch's data is what's wanted.
+    var seedsScenario: Bool { !keepData }
 
     /// The mode of this process, or `nil` for a normal launch (and in the unit-test host).
     static let current: UITestingLaunch? = parse(ProcessInfo.processInfo.arguments)

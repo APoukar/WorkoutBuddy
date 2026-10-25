@@ -180,3 +180,7 @@ As in `CLAUDE.md`, with the findings discussed with the user before anything cha
 3. `Scenario.init?(argument:)` only wrapped `init?(rawValue:)` → **accepted**: removed.
 4. The disk-store test duplicated the delete helper → **accepted**: the helper is internal and reused; a comment says the test uses the UI tests' file on purpose.
 5. UI tests took 30–100 s each on iOS 27 here, so ~28 tests could take ~20 minutes → **accepted**: the CI time estimate is updated; step 8 measures it and may split the UI tests into their own job.
+
+**Step 3a code review (2026-10-25), verdict "Approve", 2 minor findings, discussed with the user; both accepted:**
+1. The `onSummary` volume test summed reps × kg itself instead of using `SessionStats`, which the summary shows → **accepted**: checked through `SessionStats` (volume, done / skipped / not-performed counts).
+2. The seeded timestamps were only loosely checked, and one test repeated two others → **accepted**: exact `startedAt` / `lastActionAt` / `endedAt` checks (later recovery and summary tests depend on them); the redundant test removed.

@@ -54,9 +54,13 @@ struct UITestingLaunchTests {
     }
 
     @Test func unknownScenarioIsRejected() {
-        #expect(UITestingLaunch.Scenario(rawValue: "templates") == nil)
+        #expect(UITestingLaunch.Scenario(rawValue: "Templates") == nil)
         #expect(UITestingLaunch.Scenario(rawValue: "nonsense") == nil)
         #expect(UITestingLaunch.Scenario(rawValue: UITestingContract.Scenario.empty) == .empty)
+        #expect(UITestingLaunch.Scenario(rawValue: UITestingContract.Scenario.templates) == .templates)
+        #expect(UITestingLaunch.Scenario(rawValue: UITestingContract.Scenario.inProgress) == .inProgress)
+        #expect(UITestingLaunch.Scenario(rawValue: UITestingContract.Scenario.nothingDone) == .nothingDone)
+        #expect(UITestingLaunch.Scenario(rawValue: UITestingContract.Scenario.onSummary) == .onSummary)
     }
 
     @Test func contractNamesMatchTheApp() {

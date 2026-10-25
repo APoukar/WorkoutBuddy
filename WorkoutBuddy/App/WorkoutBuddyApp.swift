@@ -21,6 +21,13 @@ struct WorkoutBuddyApp: App {
             fatalError("WorkoutBuddy could not create its data store: \(error)")
         }
         Self.seed(container)
+        if let launch = UITestingLaunch.current, launch.seedsScenario {
+            do {
+                try UITestingScenario.seed(launch.scenario, in: container)
+            } catch {
+                fatalError("UI-testing scenario '\(launch.scenario.rawValue)' could not be seeded: \(error)")
+            }
+        }
     }
 
     var body: some Scene {
