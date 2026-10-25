@@ -4,6 +4,22 @@ import Foundation
 /// reads differently from how they look have a spoken form. Names are never stored in a session,
 /// so the caller looks them up from the references and passes them in.
 nonisolated enum SessionMessages {
+    // MARK: Screen labels
+
+    static let elapsedTimeLabel = "Elapsed time"
+    static let pauseLabel = "Pause"
+    static let doneButton = "Done"
+    static let skipSetButton = "Skip Set"
+    static let restTitle = "Rest"
+    static let restRemainingLabel = "Rest remaining"
+    /// Small caption under the countdown's number in the ring; VoiceOver reads `restRemainingLabel` instead.
+    static let restRemainingCaption = "Remaining"
+    static let upNextTitle = "Up next"
+    static let skipRestButton = "Skip Rest"
+    static let undoButton = "Undo"
+    static let pausedTitle = "Paused"
+    static let resumeButton = "Resume"
+
     // MARK: Positions
 
     /// "Exercise 2 of 5". `index` is zero-based.

@@ -205,4 +205,21 @@ struct SessionMessagesTests {
         #expect(SessionMessages.failureMessage(for: NSError(domain: "X", code: 1)) == ErrorMessages.generic)
         #expect(SessionMessages.failureMessage(for: NameError.empty) == ErrorMessages.generic)
     }
+
+    // MARK: Screen labels
+
+    @Test func screenLabelsReadAsTheSpecSays() {
+        #expect(SessionMessages.elapsedTimeLabel == "Elapsed time")
+        #expect(SessionMessages.pauseLabel == "Pause")
+        #expect(SessionMessages.doneButton == "Done")
+        #expect(SessionMessages.skipSetButton == "Skip Set")
+        #expect(SessionMessages.restTitle == "Rest")
+        #expect(SessionMessages.restRemainingLabel == "Rest remaining")
+        #expect(SessionMessages.restRemainingCaption == "Remaining")
+        #expect(SessionMessages.upNextTitle == "Up next")
+        #expect(SessionMessages.skipRestButton == "Skip Rest")
+        #expect(SessionMessages.undoButton == "Undo")
+        #expect(SessionMessages.pausedTitle == "Paused")
+        #expect(SessionMessages.resumeButton == "Resume")
+    }
 }
