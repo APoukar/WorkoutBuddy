@@ -1,0 +1,174 @@
+# UI tests — a permanent XCUITest target, run in CI
+
+Not a `FEATURES.md` phase: this adds a permanent UI test target so the phase 3 flows (and later phases) are checked at runtime by tests instead of throwaway harnesses. During phase 3 the code reviewers built scratch XCUITest targets again and again to check the app at runtime; this plan makes that permanent, adds the tests the reviewers ran by hand, and runs them in CI.
+
+The work goes on the branch `phase-3-session` (phase 3 is complete there, latest commit 6e67305, not pushed). Nothing is pushed and no PR is opened without the user.
+
+## Workflow
+As in `CLAUDE.md`, with the findings discussed with the user before anything changes:
+1. Steps marked **(main session)** are project setup (targets, schemes, folders, CI verification). The main session does them itself; no subagent touches the Xcode project.
+2. Every other step: run `implementer` with this plan's path and the step number, handle its "Needs main session" list, run `code-reviewer` with the plan, the step and the implementer's report, discuss the findings with the user, apply the agreed fixes through `implementer`, and commit once the build and all tests are green: `UI tests, step N: <what it did>`. If the plan changed because of the step, the plan goes in the same commit.
+
+## Scope
+- **In scope:** a `WorkoutBuddyUITests` target in the `WorkoutBuddy` scheme; a UI-testing launch mode in the app (in-memory store, isolated settings, seeded scenarios); UI tests for the phase 3 flows and a smoke test of the phase 2 template editor; CI running them; `CLAUDE.md` commands.
+- **Out of scope:** accessibility audits (`performAccessibilityAudit`) and VoiceOver checks (XCUITest's element tree also lists accessibility-hidden elements, so it can't prove what VoiceOver reaches; that stays a real-device check); screenshots or snapshot tests; Settings → Exercises tests (phase 1, well covered by unit tests); performance tests. Any of these can be added later on top of this target.
+
+## Decisions
+- **XCTest for UI tests.** UI tests need `XCUIApplication`, which is driven from `XCTestCase`; the unit tests stay on Swift Testing. The UI test classes are `@MainActor` (the target uses the same Swift 6 / `MainActor` default isolation as the others). `XCUIApplication` and `XCUIElement` are main-actor API, but `setUp` / `setUpWithError` are not, and an override keeps the isolation of the method it overrides, so **`setUpWithError` only sets `continueAfterFailure = false`**; every test starts with `let app = launch(scenario: …)` (review finding 6).
+- **One scheme, split by filters.** The UI test target joins the `WorkoutBuddy` scheme's test action, marked **not parallelizable** (UI tests on one simulator, in order). Commands select the target: unit tests with `-only-testing:WorkoutBuddyTests`, UI tests with `-only-testing:WorkoutBuddyUITests`. A plain `xcodebuild test` runs both. `CLAUDE.md`'s per-step unit command gets the filter, so implementer and reviewer runs stay as fast as today, and a separate UI command is added (step 1).
+- **Shared contract.** The launch argument names, the scenario names, the accessibility identifiers and the expected spoken texts the tests rely on are needed by both the app and the UI tests, which can't import the app module. They live in one `nonisolated` file in a new synchronized folder `UITestingContract/` at the repo root, which is a member of **both** the app target and the UI test target (main session, step 1). A typo then fails to compile instead of failing a test at runtime.
+- **The UI-testing launch mode** is switched on only by the launch argument `-uiTesting`, which only the UI tests pass. Without it nothing changes: a normal launch and the unit-test host (which never passes it) behave exactly as today. The arguments are parsed by a pure `nonisolated` function of `ProcessInfo.arguments` (unit tested). In UI-testing mode:
+  - **Store:** in memory by default, so the tests never touch the user's data on the simulator (the UI tests install over the same app the user checks by hand). A fresh store gets the normal exercise seed and then the scenario's data.
+  - **Settings:** every `@AppStorage` and `AppSettings.current()` read goes to one `AppSettings.store: UserDefaults`: `.standard` normally, and a separate suite (`net.poukar.WorkoutBuddy.uiTesting`) in UI-testing mode, cleared at launch, with **Sound and Haptics off** so test runs are silent. The app root sets `.defaultAppStorage(AppSettings.store)`; `AppSettings.current(in:)` defaults to `AppSettings.store` instead of `.standard`. (The `@AppStorage` users are exactly `SettingsView`, `WeightField` and `LargeWeightControl`; the `current()` callers are `WorkoutEditorView`, `ExerciseEditorView` and `RestAlert`.)
+  - **Region:** the UI tests launch with `-AppleLanguages (en) -AppleLocale en_US` (standard argument-domain overrides, not written anywhere), so number texts are predictable ("62.5", "1,420 kilograms") on the Czech-region simulators here and on CI alike. Foundation reads launch arguments as `-key value` pairs, so the region pairs come **first** in the argument list and the app's own flags take explicit values (`-uiTesting YES`, `-uiTestingKeepData YES`); one test asserts the English number format to prove the override applied (review finding 7). Region-dependent formatting stays covered by the unit tests (`en_CZ`).
+  - **Notifications (phase 4):** UI-testing mode never requests notification permission, so no system prompt can block a test (review finding 14).
+  - It is compiled in every configuration (no `#if DEBUG`), like the preview data, because a Debug-only helper broke the Release build before. In a Release build it still only reacts to `-uiTesting`, which a user can't pass.
+- **Seeded scenarios** (`-uiTestingScenario <name>`), built with the app's own `WorkoutLibrary` / `SessionLibrary` calls, never by poking models. Templates are built with `WorkoutDraft(name:exercises:)` and `DraftExercise` / `DraftSet` (the pattern in `SessionFixture`), and use built-in exercises looked up with `WorkoutPreviewData.exercise(named:in:)`, so names are stable. Unlike `SessionPreviewData`, scenarios call everything with `try` and stop the app with a clear message on failure, and they respect the library's rules: an action that doesn't apply is a silent no-op (Skip Set while a rest runs does nothing), so the session scenarios call `skipRest` (or pass a later `now:`) between actions. Unit tests check the resulting state of each scenario (review finding 13).
+  - `empty` (the default): the exercise seed only.
+  - `templates`: **"Short Rests"** — Bench Press 10 × 60 kg rest 10 s, Bench Press 8 × 62.5 kg rest 0, Overhead Press 8 × 40 kg rest 10 s; **"Long Rests"** — the same sets with 600 s rests (the maximum), so a test has all the time it needs on the rest screen. The short rest exercises auto-advance (10 s, so even a slow CI runner sees the rest screen first; review finding 5); the 0 rest exercises "no rest screen"; the last set exercises "straight to the summary". Completing all three sets as planned gives a volume of 1,420 kg.
+  - `inProgress`: `templates` plus a running "Long Rests" session started a few minutes ago: the first set done (10 × 60), the second skipped, the current set Overhead Press. On launch it raises the recovery alert (Resume / End Workout), exactly as after a kill; tests that only need the running workout tap Resume first. Used for recovery and for looking back at earlier sets.
+  - `nothingDone`: `templates` plus a running "Long Rests" session with only the first set skipped. On launch the alert offers Resume / Discard.
+  - `onSummary`: `templates` plus a "Long Rests" session with all three sets done, finished and waiting for Save. On launch the summary opens without asking.
+  The recovery alert is the app's real launch check; no scenario bypasses it.
+- **A real kill-and-relaunch test** needs data that survives the process, so UI-testing mode has a second store option: `-uiTestingStore disk` uses a separate store file (`UITesting.store` in the app's temporary directory, never the real `default.store`), wiped at launch unless `-uiTestingKeepData YES` is passed; with it the settings suite is kept too and no scenario is seeded. The test launches with `disk`, starts a workout, does a set, calls `XCUIApplication.terminate()`, and launches again with `disk` + keep data. This checks "progress is saved after every action" end to end, which the seeded scenarios can't. The store-file deletion moves out of `ModelContainerFactory`'s `#if targetEnvironment(simulator)` block (only the "reset the real store on a load failure" policy stays simulator-only), so device builds still compile (review finding 8).
+- **Tests check accessibility labels and values, not visible text** (review finding 1). XCUITest matches what VoiceOver gets, and many session texts have a spoken form that replaces the visible one. The expected strings are the spoken forms, for example:
+  - the position line: "Exercise 1 of 2, set 1 of 2" (not "Exercise 1 of 2 · Set 1 of 2")
+  - summary counts: "3 sets completed", "1 set skipped", "2 sets not performed"
+  - volume: one element labelled "Volume" with the value "1,420 kilograms"
+  - the kg control's value: "62.5 kilograms"; the reps control's value: "10"
+  - a Workouts list row: the workout name as its label; "Last done" is inside its value, so it's matched with `CONTAINS`
+  - "Up next": the label; the spoken line is the value
+  - the recovery message uses curly quotes around the workout name (“Long Rests”)
+  Where a value contains a date or other changing part, the test matches with `CONTAINS` / `BEGINSWITH` predicates. The exact strings the tests use are kept in the contract file.
+- **Screens are identified by layer, not by the buttons they contain** (review finding 2). During a review, and under the paused overlay, the screen underneath stays alive and, although hidden from VoiceOver, still appears in XCUITest's element tree, so `buttons["Done"]` would exist while a review shows, labels would appear twice, and `firstMatch` could read the hidden control's value. Each layer root therefore gets a **container identifier**: `.accessibilityElement(children: .contain).accessibilityIdentifier(…)` on the set screen, rest screen, review, paused overlay and summary. A `.contain` container doesn't pass its identifier down to its children and doesn't change what VoiceOver reads. Every query is scoped to the top layer, and "on the set screen" means: the set container exists and neither the review nor the paused container does.
+- **Other identifiers** only where a label is ambiguous or not reachable, on leaf elements (an identifier on a plain container is copied onto all its children in SwiftUI), never changing labels, traits or what VoiceOver reads:
+  - the set screen's **Done** button ("Done" is also the keyboard's Done button, the review badge and the template editor's Edit/Done) — the keyboard's button is queried as `app.toolbars.buttons["Done"]`;
+  - the paused overlay's **End Workout** and the summary's **Discard Workout** buttons, so the dialog helper can tell them from the confirmation's buttons (review finding 3);
+  - the large reps and kg controls (one adjustable element each).
+- **The − / + buttons and the typed value** (review finding 4). Each large control is one combined accessibility element; its − / + buttons are hidden from VoiceOver and its text field is a child of the combined element, so they may not be reachable by XCUITest, and XCUITest can't increment an adjustable element. Step 3b probes this first. If identifiers on the inner buttons and field reach XCUITest, use them; if not, keep the single VoiceOver element unchanged and tap `control.coordinate(withNormalizedOffset:)` at its left edge (−), right edge (+) or centre (the value, to type), at the default text size. The value is always read from the control's `value`.
+- **Dialogs.** "End Workout" and "Discard Workout" appear both as a screen button and as the confirmation's button. The confirmation is an action sheet on iOS 18, but on iOS 26+ a popover that animates from its source button and may replace it in the tree. One helper taps the button with `label == X AND identifier != <the screen button's identifier>`, which works whether or not the source button is still there; tests never pick by index.
+- **Waiting, not sleeping.** No `sleep`. Every wait is `waitForExistence(timeout:)`, `waitForNonExistence(timeout:)` or an `XCTNSPredicateExpectation`, with a 10 s default and 25 s for auto-advance (10 s rest plus launch load). Each test launches its own app with its own scenario, so tests don't depend on order.
+- **Swipes** use coordinate drags (`XCUICoordinate.press(forDuration:thenDragTo:withVelocity: .fast, thenHoldForDuration:)`) on the scrolling content, away from the screen edges: in phase 3 these were the real synthesized touches the app's `UISwipeGestureRecognizer` responds to.
+- **Known risk: idle waiting** (review finding 5). XCUITest waits for the app to be idle before each action. The rest screen's progress ring is a `TimelineView(.animation)`, which may keep the app "busy". Step 3b probes it on **"Long Rests"** (a short rest would end by itself and hide a stall): Done → rest screen → tap Skip Rest and time it; it must take under 3 s. If actions on the rest screen stall, the fallback (decided with the user then) is a UI-testing-only switch that draws the ring with the Reduce Motion schedule (`.periodic` by 1 s), which is already a supported mode.
+- **Fresh simulators.** The first keyboard on a new simulator may show the "Speed up your typing" introduction over the keys. CI turns it off before the UI tests (`simctl spawn <UDID> defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true` on the booted simulator), and the launch helper dismisses it if it still appears (review finding 11).
+- **No retries** of failed UI tests in CI (`-retry-tests-on-failure` hides flakiness). A flaky test is a bug to fix in the test or the app.
+- **CI time.** About 28 UI tests, each with a fresh launch; a realistic estimate is **6–10 minutes** on CI (review finding 12). The job's timeout goes from 30 to 45 minutes. Per-test durations are read from the `.xcresult`; if the suite grows too slow later, it can move to its own job.
+
+## Folder layout
+- `UITestingContract/UITestingContract.swift` — shared by the app and the UI test target.
+- `WorkoutBuddy/App/UITesting/` — the launch mode parsing, the store and settings set-up, the scenarios.
+- `WorkoutBuddyUITests/` — `Support/` (launch helper, waits, screen checks, the dialog helper, swipes, value controls), then one file per area: `TemplateEditorUITests`, `SessionFlowUITests`, `SessionEndUITests`, `ReviewSetsUITests`, `RecoveryUITests`.
+- `WorkoutBuddyTests/App/` — unit tests of the launch mode parsing and the scenarios.
+
+## Steps
+
+**Step 1 — Target, scheme and commands (main session)**
+- Create the `WorkoutBuddyUITests` UI testing bundle target (product type `com.apple.product-type.bundle.ui-testing`), done in Xcode or by editing `project.pbxproj` carefully (it's hand-written with simple IDs; the installed `xcodeproj` gem 1.22 may not understand objectVersion 77 synchronized folders). Settings, listed so they aren't copied wrongly from the unit test target (review finding 10):
+  - `TEST_TARGET_NAME = WorkoutBuddy`, and **no** `TEST_HOST` / `BUNDLE_LOADER` (those are for hosted unit tests);
+  - a target dependency on `WorkoutBuddy` (`PBXTargetDependency` with its `PBXContainerItemProxy`);
+  - `GENERATE_INFOPLIST_FILE = YES`, `PRODUCT_BUNDLE_IDENTIFIER = net.poukar.WorkoutBuddyUITests`, `IPHONEOS_DEPLOYMENT_TARGET = 18.0`, `TARGETED_DEVICE_FAMILY = 1`, `SWIFT_VERSION = 6.0`, `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`, `SWIFT_APPROACHABLE_CONCURRENCY = YES`, signing as the unit test target;
+  - the synchronized folder `WorkoutBuddyUITests/` in its `fileSystemSynchronizedGroups`.
+- Create the synchronized folder `UITestingContract/`, listed in **both** the app's and the UI test target's `fileSystemSynchronizedGroups`, with `UITestingContract.swift` holding only the `-uiTesting` argument for now.
+- Add the target to the shared scheme's test action, `parallelizable = "NO"`.
+- One placeholder test, `LaunchUITests.testAppLaunches`, launches the app with `-uiTesting YES` and waits for the Workouts tab, only to prove the target runs. No Xcode template launch-screenshot tests (they run once per configuration and are slow). Step 2 deletes the placeholder.
+- `CLAUDE.md`: the unit test command gets `-only-testing:WorkoutBuddyTests`; add "Run the UI tests" (`-only-testing:WorkoutBuddyUITests`, plus `-parallel-testing-enabled NO` on iOS 18.2), the flakiness check (`-test-iterations 3 -run-tests-until-failure`), and one sentence on when to run them (steps that touch views or the UI tests; the code reviewer runs them on both OS versions); mention the new target and folder under "Project setup".
+- Check: unit tests and the placeholder pass on iPhone 17 / iOS 27.0 and iPhone 16 / iOS 18.2; `xcodebuild build-for-testing` builds both bundles; the Release build still succeeds.
+
+**Step 2 — UI-testing launch mode, launch helper and the template editor smoke test**
+- `WorkoutBuddy/App/UITesting/UITestingLaunch.swift` (`nonisolated`, pure): `parse(_ arguments: [String]) -> UITestingLaunch?` returning `nil` without `-uiTesting`, else the options: scenario (default `empty`; an unknown name is a programming error and stops the app with a clear message), store (`memory` default / `disk`), keep data. Flags take explicit values (`YES`), see "Region".
+- `ModelContainerFactory`: a way to build the UI-testing disk store at its own URL (`UITesting.store` in the temporary directory), deleting its files first unless keep data. The file deletion moves out of the simulator-only `#if`; the real store's load-failure policy doesn't change.
+- `AppSettings.store`: `.standard`, or the cleared UI-testing suite with Sound and Haptics off. `AppSettings.current(in:)` defaults to it. `WorkoutBuddyApp` sets `.defaultAppStorage(AppSettings.store)` on the root view, so `SettingsView`, `WeightField` and `LargeWeightControl` follow without changes.
+- `WorkoutBuddyApp.init`: decides the container from the launch mode (UI testing first, then the existing unit-test check, then the real store), then seeds the exercises as today. (Scenarios come in step 3a; until then every scenario name other than `empty` is rejected.)
+- Unit tests: parsing (no flag → `nil`; defaults; each option; flags in any order; values missing or not `YES`); the disk-store URL is never the real store's; `AppSettings.current(in:)` still reads `.standard` when not UI testing (the existing `AppSettingsTests` stay green).
+- `WorkoutBuddyUITests/Support/`: `launch(scenario:store:keepData:)` (region pairs first, then `-uiTesting YES` and the options; dismisses the keyboard introduction if it appears) and the wait helpers.
+- UI tests (`TemplateEditorUITests`, the phase 2 smoke test): with `empty`, create "Smoke Test" — name, Add Exercise, search "Bench", pick Bench Press, change reps with the stepper, Save — and see it in the Workouts list; open it and see Start Workout enabled. A second test checks isolation: change the default reps in Settings, relaunch, and see the default again (the suite is cleared). Delete `LaunchUITests`.
+- Checks: unit and UI tests on both OS versions, the Release build, and a device build (`xcodebuild build -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO`).
+
+**Step 3a — Seeded scenarios (app code only)**
+- `WorkoutBuddy/App/UITesting/UITestingScenario.swift`: the scenarios from the Decisions (`templates`, `inProgress`, `nothingDone`, `onSummary`), seeded only into a fresh store, built as described there (`try`, a clear stop on failure, `skipRest` between actions, reused lookups and drafts).
+- Unit tests, with an in-memory container: each scenario's templates, sets and rests, and each session's state (current set, done / skipped sets, finished or not, `LaunchRecovery.decide` giving the expected answer).
+- Checks: unit tests on both OS versions; the Release build.
+
+**Step 3b — Layer identifiers, support code, probes and the first session flow**
+- Accessibility identifiers (contract file): the five layer containers, the set screen's Done, the paused overlay's End Workout, the summary's Discard Workout, the large reps and kg controls. Nothing else unless a test can't find an element; any extra one is listed in the report. The expected spoken strings go into the contract file too.
+- `WorkoutBuddyUITests/Support/`: screen checks scoped to the top layer (`assertSetScreen(exercise:position:)`, `assertRestScreen()`, `assertSummary(title:)`, `assertReview(status:)`), the confirmation-dialog helper, the coordinate swipe helper, and the value-control helper (− / + / type / read value, by inner identifiers or by coordinates, whichever the probe shows works).
+- **Probes first**, each reported with what was found, on iOS 27 and 18.2:
+  1. Idle waiting on "Long Rests": Done → rest screen → Skip Rest takes under 3 s.
+  2. An `app.debugDescription` dump while a review shows and while paused: the layer containers are there and the scoped queries pick the top layer.
+  3. Whether the − / + buttons and the text field can be reached (see Decisions); the helper uses the way that works.
+  4. The dialog helper: Pause → End Workout → the confirmation → Cancel, on both OS versions.
+  5. One coordinate swipe right on the set screen opens a review.
+  These stay as tests where they make sense (the dialog and swipe probes become parts of steps 5 and 6's tests; the idle probe stays as `SessionFlowUITests.testRestScreenRespondsQuickly`).
+- `SessionFlowUITests.testDoneRestAutoAdvanceToSummaryAndSave`: `templates` → "Short Rests" → Start Workout → set screen "Bench Press", "Exercise 1 of 2, set 1 of 2" → Done → rest screen → after 10 s the second Bench Press set opens by itself → Done (0 rest) → Overhead Press opens straight away → Done → summary "Workout Complete", "3 sets completed", volume "1,420 kilograms" (which also proves the English region applied) → Save → the cover closes and the "Short Rests" row's value contains "Last done".
+
+**Step 4 — Set actions, rest actions and pause**
+- `SessionFlowUITests` (all on "Long Rests" unless noted):
+  - − / + on reps and kg change the values; Done saves them: the summary volume reflects the changed values (e.g. reps 11 and kg 62.5 on the first set).
+  - Typing a kg value through the keyboard and its Done bar (`app.toolbars.buttons["Done"]`, the phase 1 `DecimalTextField`): "57.5" is kept after Done.
+  - Skip Set on the first set → the second set opens with no rest screen.
+  - Done → rest screen with "Up next" naming Bench Press → Skip Rest → the second set.
+  - Done → Undo → the first set again with the values entered before Done.
+  - Pause on the set screen → the paused layer with Resume and End Workout → Resume → the set screen. The same on the rest screen, and the rest screen is still there after Resume.
+
+**Step 5 — Ending: summary, Save, Back to Workout, Discard**
+- `SessionEndUITests`:
+  - End early with a done set: Done, Skip Rest, Pause → End Workout → confirmation "End Workout?" → End Workout → summary "Workout Ended" with "1 set completed" and "2 sets not performed" → Save → cover closes, "Last done" shows.
+  - Back to Workout after Done on the last set ("Long Rests": Done, Skip Rest, Done, Skip Rest, Done): summary → Back to Workout → the Overhead Press set screen again; Done → summary again.
+  - Back to Workout after an early end: summary → Back to Workout → the second set's screen.
+  - Nothing done: Start → Pause → End Workout → "Discard Workout?" → Discard Workout → the cover closes and the row's value doesn't contain "Last done".
+  - Every set skipped: the summary is "Workout Ended" with the can't-save note and Discard Workout instead of Save → Discard Workout → confirm → the cover closes.
+
+**Step 6 — Looking back at earlier sets**
+- `ReviewSetsUITests`, on `inProgress` (tap Resume first) unless noted:
+  - Change the current set's reps, then swipe right → the review of the skipped second set (status "Skipped") → swipe right → the done first set (status "Done") → swipe left twice → the current set, with its unsaved reps change still there.
+  - The Previous Set button and the bottom bar's Previous / Next / Back to Current Set do the same.
+  - Edit the done set's kg with + → Back to Current Set → finish the workout → the summary volume includes the corrected kg.
+  - Mark as Done on the skipped set → its status reads "Done"; Mark as Skipped on the done set → "Skipped".
+  - From the summary (`onSummary`): Review Sets → the last set's review with no Pause button → Mark as Skipped on all three → Back to Summary → Discard Workout replaces Save (the workout can't be saved any more).
+  - (No "swipes ignored while paused" test: the paused overlay already takes every touch, so such a test couldn't fail for the reason it names; review finding 12.)
+
+**Step 7 — Recovery after a kill**
+- `RecoveryUITests`:
+  - `inProgress`: the alert "Resume Workout?" with the message naming “Long Rests” → Resume → the Overhead Press set screen; no session layer exists before the alert is answered.
+  - `inProgress` → End Workout → the summary "Workout Ended" → Save → the list shows "Last done".
+  - `nothingDone` → the alert offers Discard, not End Workout → Discard → no cover, no "Last done".
+  - `onSummary` → the summary opens without an alert.
+  - Real kill (disk store): `templates` → "Long Rests" → Start → Done → rest screen → `terminate()` → relaunch with keep data → the alert → Resume → the rest screen still counting down; the same with End Workout → the summary with "1 set completed".
+
+**Step 8 — CI and documentation**
+- `.github/workflows/ci.yml`:
+  - The Build step gets `id: build`; `build-for-testing` builds both test bundles as now.
+  - The unit test step gets `-only-testing:WorkoutBuddyTests` and `-resultBundlePath UnitTests.xcresult`.
+  - Before the UI tests: boot the created simulator and turn off the keyboard introduction (see "Fresh simulators").
+  - A new **UI tests** step on the same simulator: `test-without-building -only-testing:WorkoutBuddyUITests -parallel-testing-enabled NO -resultBundlePath UITests.xcresult`; it runs even when the unit tests failed (`if: ${{ !cancelled() && steps.build.outcome == 'success' }}`), so both results show.
+  - The upload step uploads both bundles on failure. `timeout-minutes: 45`.
+- `CLAUDE.md` CI paragraph: the UI tests run in CI; the `.xcresult` bundles are uploaded on failure; CI still doesn't run iOS 18, so UI tests on iOS 18.2 stay a local check.
+- **(main session)** Verify CI: needs a push, which is the user's call (the branch also carries phase 3). If the user agrees, push, watch the run and record the UI step's duration here.
+
+## Hooks left for later phases
+- **Phase 4:** UI-testing mode never requests notification permission (decided above), so the permission prompt can't block tests. Live Activity and notification content can't be checked by XCUITest in the app; keep them in unit tests and the manual check.
+- **Phases 5–7:** add scenarios for saved history (several sessions on different days) and UI tests for the calendar, session detail, charts and export as those phases land. New flows get UI tests in the same step that builds them.
+- **UI tidying session:** the label-based queries will need updating if button texts or spoken forms change; the contract file is the place to keep the shared ones.
+
+## Verification
+- Each step: build; unit tests and UI tests green on iPhone 17 / iOS 27.0 and iPhone 16 / iOS 18.2 (with `-parallel-testing-enabled NO` there); Release build for steps that touch app code; `code-reviewer` reviews the step. Count tests and read per-test durations from the `.xcresult` (`xcrun xcresulttool get test-results summary` / `tests`), not the console log.
+- Before a step with new UI tests is committed, run its test class with `-test-iterations 3 -run-tests-until-failure` on iOS 27, to catch flakiness early.
+- At the end: the full UI suite twice on each OS version, and (if the user allows the push) one green CI run with its UI step duration recorded.
+- `xcodebuild test` sometimes hangs in `simctl diagnose`; kill it and retry once.
+
+## Review decisions
+**Architect review (2026-10-25), verdict "Approve with changes", 14 findings, discussed with the user; all accepted:**
+1. Tests would search for visible text, but XCUITest matches the spoken labels and values → tests check the spoken forms, listed in the Decisions and kept in the contract file.
+2. Hidden screens under a review or the paused overlay stay in the element tree → container identifiers per layer; every query scoped to the top layer.
+3. "Done", "End Workout" and "Discard Workout" are ambiguous; iOS 26 popovers may replace their source button → identifiers on those buttons; the dialog helper excludes the screen button's identifier; the keyboard's Done via `app.toolbars`.
+4. The − / + buttons and the text field may not be reachable → probed first in step 3b; coordinate taps on the control as the fallback.
+5. A 5 s rest would hide an idle-wait stall and is tight on CI → the probe runs on "Long Rests"; "Short Rests" rests are 10 s.
+6. `setUp` can't launch the app under Swift 6 isolation → each test launches through the helper.
+7. Value-less flags may swallow the locale pairs → region pairs first, flags take `YES`, one assertion proves the English format.
+8. The store-file deletion is simulator-only → moved out of the `#if`; a device build check in step 2.
+9. Step order and size → launch helper in step 2; step 3 split into 3a (scenarios) and 3b (identifiers, helpers, probes, first flow).
+10. UI test target settings → listed explicitly in step 1.
+11. CI: missing `id: build`; the keyboard introduction on a fresh simulator → both handled in step 8 and the launch helper.
+12. CI time estimate optimistic; an untestable paused-swipe test; a redundant placeholder → 6–10 min estimate, test dropped, placeholder deleted in step 2, `-test-iterations 3` for the flakiness check.
+13. Scenarios could silently seed the wrong state → `try`, a clear stop on failure, `skipRest` between actions, reused lookups and draft initialiser, state checked by unit tests.
+14. Phase 4 notification prompt → UI-testing mode never requests notification permission.
