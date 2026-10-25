@@ -46,6 +46,7 @@ struct PausedOverlayView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
+            .accessibilityIdentifier(UITestingContract.Identifier.pausedEndWorkout)
             .sessionConfirmation($confirmation, onConfirm: onConfirm)
         }
         .accessibilityAddTraits(.isModal)

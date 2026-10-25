@@ -230,7 +230,7 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
 - **Phase 5:** history shows `completed` and `endedEarly` sessions only (an `inProgress` one with `endedAt` is waiting for Save). Session names come from `session.workout`, which may be soft-deleted. Use `SessionStats`, `Formatters.duration` and `Formatters.volume`.
 - **Phase 6:** the summary's "New Records" section; PRs computed in `SessionLibrary.finalize` (every save goes through it) and recalculated on delete.
 - ~~**Later (user's call):** an Undo on the summary for an accidental Done on the last set.~~ Done in step 9 (Back to Workout).
-- **UI tidying session (user's plan, after the features are in):** the user isn't keen on the current look. Ideas collected so far: cap the bottom bars' text size or shrink secondary buttons at AX sizes (the review bar with Mark as Done is about 50% of the screen at AX5; the summary bar about 40%); the bordered secondary buttons' contrast over the iOS 18 `.bar` background.
+- **UI tidying session (user's plan, after the features are in):** the user isn't keen on the current look. Ideas collected so far: cap the bottom bars' text size or shrink secondary buttons at AX sizes (the review bar with Mark as Done is about 50% of the screen at AX5; the summary bar about 40%); the bordered secondary buttons' contrast over the iOS 18 `.bar` background. **Functional:** on iPhone 17 at the default text size the reps + button's centre sits about 8 pt inside the set screen's bottom bar, so a low tap on + can press Done (found by the UI tests' step 3b probe, `docs/plans/ui-tests.md`).
 - **Phase 7:** export includes `pausedAt`, `restEndsAt` (normally `nil` for saved sessions) and `lastActionAt`.
 
 ## Verification

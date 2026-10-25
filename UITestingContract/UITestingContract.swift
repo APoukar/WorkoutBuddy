@@ -45,6 +45,46 @@ nonisolated enum UITestingContract {
         static let disk = "disk"
     }
 
+    /// Accessibility identifiers. The layer ones are container identifiers (`.accessibilityElement(children:
+    /// .contain)`), so a test can tell which layer is on top: during a review and under the paused overlay the
+    /// screen underneath stays in XCUITest's element tree. The others sit on leaf elements whose label is
+    /// ambiguous or whose parts aren't reachable.
+    nonisolated enum Identifier {
+        static let setScreen = "session.setScreen"
+        static let restScreen = "session.restScreen"
+        static let review = "session.review"
+        static let paused = "session.paused"
+        static let summary = "session.summary"
+        /// The set screen's Done ("Done" is also the keyboard's, the review badge's and the editor's).
+        static let setDone = "session.setScreen.done"
+        /// The paused overlay's End Workout (the confirmation has a button with the same label).
+        static let pausedEndWorkout = "session.paused.endWorkout"
+        /// The summary's Discard Workout (the confirmation has a button with the same label).
+        static let summaryDiscardWorkout = "session.summary.discardWorkout"
+        /// The large reps and kg controls, one adjustable element each (on the set screen and the review).
+        static let repsControl = "session.reps"
+        static let kgControl = "session.kg"
+    }
+
+    /// The spoken forms XCUITest sees as labels and values (it matches what VoiceOver gets, not the visible text).
+    nonisolated enum Spoken {
+        static func position(exercise: Int, of exercises: Int, set: Int, of sets: Int) -> String {
+            "Exercise \(exercise) of \(exercises), set \(set) of \(sets)"
+        }
+        static let volumeLabel = "Volume"
+        /// The summary volume of the `templates` workouts when every set is done as planned.
+        static let plannedVolume = "1,420 kilograms"
+        /// The summary count line, "3 sets completed" or "1 set completed".
+        static func setsCompleted(_ count: Int) -> String { "\(count) \(count == 1 ? "set" : "sets") completed" }
+        static let upNextLabel = "Up next"
+        static let repsLabel = "Reps"
+        static let weightLabel = "Weight"
+        static let workoutComplete = "Workout Complete"
+        static let workoutEnded = "Workout Ended"
+        /// The Workouts list row's value contains this once the workout has been done.
+        static let lastDone = "Last done"
+    }
+
     /// The `UserDefaults` suite the app reads its settings from in UI-testing mode.
     static let settingsSuiteName = "net.poukar.WorkoutBuddy.uiTesting"
 }

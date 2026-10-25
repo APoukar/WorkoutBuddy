@@ -37,7 +37,9 @@ struct SetEditorContent<BelowPosition: View, Footer: View>: View {
                 }
 
                 LargeRepsControl(reps: $reps)
+                    .accessibilityIdentifier(UITestingContract.Identifier.repsControl)
                 LargeWeightControl(kg: $kg)
+                    .accessibilityIdentifier(UITestingContract.Identifier.kgControl)
 
                 footer
             }

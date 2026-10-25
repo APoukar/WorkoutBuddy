@@ -93,6 +93,7 @@ struct SessionSummaryView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.extraLarge)
+                .accessibilityIdentifier(UITestingContract.Identifier.summaryDiscardWorkout)
                 .sessionConfirmation($confirmation, onConfirm: onConfirm)
             }
             Button(action: onBackToWorkout) {

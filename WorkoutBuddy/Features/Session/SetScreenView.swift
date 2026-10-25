@@ -114,6 +114,7 @@ private struct SetEditor: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.extraLarge)
+            .accessibilityIdentifier(UITestingContract.Identifier.setDone)
 
             Button {
                 onSkip(setID)

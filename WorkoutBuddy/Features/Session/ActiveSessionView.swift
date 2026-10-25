@@ -105,6 +105,7 @@ struct ActiveSessionView: View {
                     .accessibilityHidden(paused)
                     .environment(\.isCoveredByLayer, paused)
                     .accessibilityAddTraits(.isModal)
+                    .layerIdentifier(UITestingContract.Identifier.review)
             }
             if paused {
                 PausedOverlayView(
@@ -113,6 +114,7 @@ struct ActiveSessionView: View {
                     onEnd: { confirmation = SessionConfirmation.forEndTap(in: snapshot) },
                     confirmation: $confirmation,
                     onConfirm: confirm)
+                    .layerIdentifier(UITestingContract.Identifier.paused)
                     .transition(.opacity)
                     .zIndex(1)
             }
@@ -213,6 +215,7 @@ struct ActiveSessionView: View {
                 onPause: { run("Pause workout") { try $0.pause(in: $1) } },
                 onReviewPrevious: newestReviewable.map { id in { showReview(id, from: .left) } },
                 isPaused: snapshot.isPaused)
+            .layerIdentifier(UITestingContract.Identifier.setScreen)
 
         case .rest(let next, let remaining):
             let nextEntry = snapshot.entries[next]
@@ -233,6 +236,7 @@ struct ActiveSessionView: View {
                 onSkipRest: { run("Skip rest") { try $0.skipRest(in: $1) } },
                 onUndo: { setID in run("Undo set") { try $0.undo(in: $1, setID: setID) } },
                 onPause: { run("Pause workout") { try $0.pause(in: $1) } })
+            .layerIdentifier(UITestingContract.Identifier.restScreen)
 
         case .summary:
             let newestReviewable = snapshot.previousReviewIndex(from: nil).map { snapshot.entries[$0].id }
@@ -245,6 +249,7 @@ struct ActiveSessionView: View {
                 confirmation: $confirmation,
                 onConfirm: confirm,
                 onReview: newestReviewable.map { id in { showReview(id, from: .left) } })
+            .layerIdentifier(UITestingContract.Identifier.summary)
         }
     }
 
@@ -317,6 +322,14 @@ struct ActiveSessionView: View {
     private func settleExpiredRest() {
         guard let session = freshSession(), library.snapshot(of: session).hasExpiredRest(now: .now) else { return }
         run("Finish rest") { try $0.finishRest(in: $1) }
+    }
+}
+
+private extension View {
+    /// Marks a session layer for the UI tests: a container, so the identifier isn't copied onto the
+    /// children and VoiceOver reads the layer exactly as before.
+    func layerIdentifier(_ identifier: String) -> some View {
+        accessibilityElement(children: .contain).accessibilityIdentifier(identifier)
     }
 }
 
