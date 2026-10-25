@@ -121,6 +121,36 @@ nonisolated struct SessionSnapshot: Equatable, Sendable {
         return (entry.actualReps ?? entry.planned.reps, entry.actualKg ?? entry.planned.kg)
     }
 
+    // MARK: Review
+
+    /// The sets that can be looked at in review: done or skipped, in order. Not-performed and pending sets
+    /// never are. While the workout runs only sets before the current one count (sets are done in order);
+    /// once it's finished, all of them do.
+    var reviewableIndices: [Int] {
+        let limit = isFinished ? entries.count : (currentSetIndex ?? entries.count)
+        return (0..<limit).filter { entries[$0].status == .done || entries[$0].status == .skipped }
+    }
+
+    /// The reviewable set with this ID, or `nil` when there's no such set or it can't be reviewed (any more).
+    func reviewIndex(ofSetWithID id: UUID?) -> Int? {
+        guard let id else { return nil }
+        return reviewableIndices.first { entries[$0].id == id }
+    }
+
+    /// The next older reviewable set. `from == nil` means the current set or the summary, so this is the
+    /// newest reviewable set. `nil` when there's none (or `from` is the oldest).
+    func previousReviewIndex(from index: Int?) -> Int? {
+        let indices = reviewableIndices
+        guard let index else { return indices.last }
+        return indices.last { $0 < index }
+    }
+
+    /// The next newer reviewable set. `nil` past the newest one (or from `nil`): back to the current set or the summary.
+    func nextReviewIndex(from index: Int?) -> Int? {
+        guard let index else { return nil }
+        return reviewableIndices.first { $0 > index }
+    }
+
     /// The last moment the user did something: `pausedAt` if paused, else the latest of the last action
     /// (Done, Skip, Skip Rest, Undo, Pause, Resume, ...), the resolution of a done or skipped set, and the
     /// start. Used to end an interrupted workout at a sensible time.

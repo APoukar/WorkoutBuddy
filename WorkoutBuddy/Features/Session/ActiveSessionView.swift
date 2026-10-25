@@ -18,6 +18,10 @@ struct ActiveSessionView: View {
     /// to ask; the overlay and the summary show the dialog from their buttons.
     @State private var confirmation: SessionConfirmation?
     @State private var error: Error?
+    /// The earlier set being looked at, by ID. The review shows only if the set is still reviewable.
+    @State private var reviewedID: UUID?
+    /// Where the review layer's next content comes from (see `ReviewSlideTransition`).
+    @State private var slide = ReviewSlideDirection()
 
     init(sessionID: UUID) {
         self.sessionID = sessionID
@@ -70,13 +74,38 @@ struct ActiveSessionView: View {
             startedAt: snapshot.startedAt, pausedDuration: snapshot.pausedDuration,
             pausedAt: paused ? snapshot.pausedAt : nil)
         let animation: Animation? = reduceMotion ? nil : .easeInOut(duration: 0.25)
+        // The review is a layer above the set screen or the summary (never the rest screen), decided by
+        // looking the ID up: if the set is gone or no longer reviewable, the normal screen shows.
+        let reviewIndex: Int? = {
+            if case .rest = screen { return nil }
+            return snapshot.reviewIndex(ofSetWithID: reviewedID)
+        }()
+        let reviewIdentity = reviewIndex.map { ReviewLayerIdentity(screen: key, reviewed: snapshot.entries[$0].id) }
+        let reviewing = reviewIndex != nil
 
         return ZStack {
             screenView(screen, snapshot: snapshot, names: names, workoutName: workoutName, timer: timer, now: now)
                 .id(key)
                 .transition(.opacity)
+                // Under the review the screen stays alive (its unsaved reps and kg survive a look back),
+                // but can't be seen, touched or read.
+                .opacity(reviewing ? 0 : 1)
+                .allowsHitTesting(!reviewing)
                 // The paused overlay is modal; the screen underneath is not reachable by VoiceOver.
-                .accessibilityHidden(paused)
+                .accessibilityHidden(paused || reviewing)
+                // Header, content and bottom bar are all hidden from VoiceOver (the bar sits outside the content).
+                .environment(\.isCoveredByLayer, paused || reviewing)
+            if let reviewIndex, let reviewIdentity {
+                reviewLayer(
+                    at: reviewIndex, screen: screen, snapshot: snapshot, names: names, workoutName: workoutName,
+                    timer: timer)
+                    .background(.background)
+                    .id(reviewIdentity)
+                    .transition(reduceMotion ? AnyTransition.opacity : AnyTransition(ReviewSlideTransition(direction: slide)))
+                    .accessibilityHidden(paused)
+                    .environment(\.isCoveredByLayer, paused)
+                    .accessibilityAddTraits(.isModal)
+            }
             if paused {
                 PausedOverlayView(
                     timer: timer,
@@ -90,6 +119,68 @@ struct ActiveSessionView: View {
         }
         .animation(animation, value: key)
         .animation(animation, value: paused)
+        // The review moves or cross-fades even with Reduce Motion (it's a fade then).
+        .animation(.easeInOut(duration: 0.25), value: reviewIdentity)
+        .onChange(of: key) { _, newKey in
+            // The workout ended while looking back (Pause, End Workout): show the summary, not the review.
+            if newKey == .summary, reviewedID != nil { reviewedID = nil }
+        }
+        .onChange(of: reviewIndex) { _, newIndex in
+            // The set went away (or the rest screen came up): forget it, so it doesn't pop up again later.
+            if newIndex == nil, reviewedID != nil { reviewedID = nil }
+        }
+    }
+
+    /// Identifies the review layer: a different screen underneath or a different set means new content.
+    private struct ReviewLayerIdentity: Hashable {
+        var screen: SessionScreenKey
+        var reviewed: UUID
+    }
+
+    /// Opens the review of a set (or, with `nil`, closes it), sliding in from `side`. Text editing ends first.
+    private func showReview(_ id: UUID?, from side: ReviewSlideSide) {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        slide.side = side
+        reviewedID = id
+    }
+
+    private func reviewLayer(
+        at index: Int, screen: SessionScreen, snapshot: SessionSnapshot, names: [UUID: String], workoutName: String,
+        timer: ElapsedTimerInfo
+    ) -> some View {
+        let entry = snapshot.entries[index]
+        let prefill = snapshot.prefill(forSetAt: index)
+        let fromSummary = screen == .summary
+        let previous = snapshot.previousReviewIndex(from: index).map { snapshot.entries[$0].id }
+        let next = snapshot.nextReviewIndex(from: index).map { snapshot.entries[$0].id }
+        // From the summary the time is frozen at the end and there's no Pause.
+        let frozen = ElapsedTimerInfo(
+            startedAt: snapshot.startedAt, pausedDuration: snapshot.pausedDuration, pausedAt: snapshot.endedAt)
+        return SetReviewView(
+            workoutName: workoutName,
+            timer: fromSummary ? frozen : timer,
+            onPause: fromSummary ? nil : { run("Pause workout") { try $0.pause(in: $1) } },
+            setID: entry.id,
+            status: entry.status,
+            exerciseName: entry.exerciseID.flatMap { names[$0] } ?? SessionMessages.fallbackExerciseName,
+            position: SessionMessages.position(of: index, in: snapshot),
+            spokenPosition: SessionMessages.spokenPosition(of: index, in: snapshot),
+            initialReps: prefill.reps,
+            initialKg: prefill.kg,
+            backTitle: fromSummary ? SessionMessages.backToSummaryButton : SessionMessages.backToCurrentSetButton,
+            hasPrevious: previous != nil,
+            nextGoesBack: next == nil,
+            isPaused: snapshot.isPaused,
+            onEdit: { setID, reps, kg in
+                run("Edit set") { try $0.editDoneSet(in: $1, setID: setID, reps: reps, kg: kg) }
+            },
+            onMarkDone: { setID, reps, kg in
+                run("Mark set as done") { try $0.markSkippedAsDone(in: $1, setID: setID, reps: reps, kg: kg) }
+            },
+            onMarkSkipped: { setID in run("Mark set as skipped") { try $0.markDoneAsSkipped(in: $1, setID: setID) } },
+            onPrevious: { if let previous { showReview(previous, from: .left) } },
+            onNext: { showReview(next, from: .right) },
+            onBack: { showReview(nil, from: .right) })
     }
 
     @ViewBuilder
@@ -103,6 +194,7 @@ struct ActiveSessionView: View {
             let prefill = snapshot.prefill(forSetAt: index)
             let nextName = snapshot.entries.indices.contains(index + 1)
                 ? snapshot.entries[index + 1].exerciseID.flatMap { names[$0] } : nil
+            let newestReviewable = snapshot.previousReviewIndex(from: nil).map { snapshot.entries[$0].id }
             SetScreenView(
                 workoutName: workoutName,
                 timer: timer,
@@ -118,7 +210,9 @@ struct ActiveSessionView: View {
                     run("Complete set") { try $0.completeSet(in: $1, setID: setID, reps: reps, kg: kg) }
                 },
                 onSkip: { setID in run("Skip set") { try $0.skipSet(in: $1, setID: setID) } },
-                onPause: { run("Pause workout") { try $0.pause(in: $1) } })
+                onPause: { run("Pause workout") { try $0.pause(in: $1) } },
+                onReviewPrevious: newestReviewable.map { id in { showReview(id, from: .left) } },
+                isPaused: snapshot.isPaused)
 
         case .rest(let next, let remaining):
             let nextEntry = snapshot.entries[next]
@@ -141,6 +235,7 @@ struct ActiveSessionView: View {
                 onPause: { run("Pause workout") { try $0.pause(in: $1) } })
 
         case .summary:
+            let newestReviewable = snapshot.previousReviewIndex(from: nil).map { snapshot.entries[$0].id }
             SessionSummaryView(
                 workoutName: workoutName,
                 content: SessionSummaryContent(SessionStats(snapshot, now: now)),
@@ -148,7 +243,8 @@ struct ActiveSessionView: View {
                 onDiscard: { confirmation = .discard },
                 onBackToWorkout: { run("Back to workout") { try $0.backToWorkout(in: $1) } },
                 confirmation: $confirmation,
-                onConfirm: confirm)
+                onConfirm: confirm,
+                onReview: newestReviewable.map { id in { showReview(id, from: .left) } })
         }
     }
 

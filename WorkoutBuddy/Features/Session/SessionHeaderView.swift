@@ -1,11 +1,12 @@
 import SwiftUI
 
 /// The strip at the top of the set and rest screens: the workout name, the elapsed time (rendered by
-/// the system, so it ticks on the second without redraws) and a Pause button.
+/// the system, so it ticks on the second without redraws) and a Pause button. Without `onPause` (the
+/// review from the summary, where the time is frozen) there is no Pause button.
 struct SessionHeaderView: View {
     let workoutName: String
     let timer: ElapsedTimerInfo
-    let onPause: () -> Void
+    let onPause: (() -> Void)?
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -18,20 +19,23 @@ struct SessionHeaderView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Button(action: onPause) {
-                Image(systemName: "pause.fill")
-                    .font(.title3)
-                    .frame(minWidth: 44, minHeight: 44)
+            if let onPause {
+                Button(action: onPause) {
+                    Image(systemName: "pause.fill")
+                        .font(.title3)
+                        .frame(minWidth: 44, minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.circle)
+                .accessibilityLabel(SessionMessages.pauseLabel)
             }
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.circle)
-            .accessibilityLabel(SessionMessages.pauseLabel)
         }
         .padding(.horizontal)
         .padding(.top, 8)
         .padding(.bottom, 4)
         // Keep the strip from squeezing the content at the largest text sizes.
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+        .accessibilityHiddenWhenCovered()
     }
 }
 

@@ -165,6 +165,45 @@ struct SessionLibrary {
         try perform(session, now: now) { _ in }
     }
 
+    // MARK: Review edits
+
+    /// Corrects the reps and kg of a done set (clamped and snapped). Does nothing, without saving or
+    /// stamping, when the values equal the stored ones. Works on a running session and on one waiting for
+    /// Save; never touches rests, pauses or `completedAt`.
+    func editDoneSet(in session: WorkoutSession, setID: UUID, reps: Int, kg: Double, now: Date = .now) throws {
+        guard session.status == .inProgress, let set = modelSet(id: setID, in: session), set.status == .done else { return }
+        let newReps = AppSettings.clampReps(reps)
+        let newKg = AppSettings.snapKg(kg)
+        guard set.actualReps != newReps || set.actualKg != newKg else { return }
+        try commit {
+            set.actualReps = newReps
+            set.actualKg = newKg
+            stampReview(session, now: now)
+        }
+    }
+
+    /// Marks a skipped set as done with the given reps and kg (clamped and snapped); keeps the skip's `completedAt`.
+    func markSkippedAsDone(in session: WorkoutSession, setID: UUID, reps: Int, kg: Double, now: Date = .now) throws {
+        guard session.status == .inProgress, let set = modelSet(id: setID, in: session), set.status == .skipped else { return }
+        try commit {
+            set.status = .done
+            set.actualReps = AppSettings.clampReps(reps)
+            set.actualKg = AppSettings.snapKg(kg)
+            stampReview(session, now: now)
+        }
+    }
+
+    /// Marks a done set as skipped: its actual values are cleared (skipped sets have none); keeps `completedAt`.
+    func markDoneAsSkipped(in session: WorkoutSession, setID: UUID, now: Date = .now) throws {
+        guard session.status == .inProgress, let set = modelSet(id: setID, in: session), set.status == .done else { return }
+        try commit {
+            set.status = .skipped
+            set.actualReps = nil
+            set.actualKg = nil
+            stampReview(session, now: now)
+        }
+    }
+
     // MARK: Pause, end, discard, save
 
     /// Pause: freezes the elapsed time and any running rest until Resume. Does nothing when already paused.
@@ -305,6 +344,11 @@ struct SessionLibrary {
             set.actualKg = nil
             set.completedAt = nil
         }
+    }
+
+    /// A review edit counts as activity only while the workout runs; a finished one keeps its `endedAt` and duration.
+    private func stampReview(_ session: WorkoutSession, now: Date) {
+        if session.endedAt == nil { session.lastActionAt = now }
     }
 
     /// Runs `body` and saves once; a failed save is rolled back and rethrown.

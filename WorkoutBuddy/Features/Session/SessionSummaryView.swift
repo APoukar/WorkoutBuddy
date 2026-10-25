@@ -2,8 +2,9 @@ import SwiftUI
 
 /// The workout summary (F5): title, workout name, duration, set counts, total volume and the pinned
 /// Save button. Without a done set it offers Discard Workout instead, with a note. Back to Workout goes
-/// under either one. Takes plain values and callbacks only; Discard only reports the tap, and the owner decides what to ask and keeps the
-/// state. The confirmation dialog is anchored to the Discard Workout button.
+/// under either one. Takes plain values and callbacks only; Discard only reports the tap, and the owner
+/// decides what to ask and keeps the state. The confirmation dialog is anchored to the Discard Workout
+/// button. When finished sets can be looked at, a Review Sets row (and a swipe right) opens the review.
 struct SessionSummaryView: View {
     let workoutName: String
     let content: SessionSummaryContent
@@ -13,6 +14,13 @@ struct SessionSummaryView: View {
     /// The question being asked, owned by the caller.
     @Binding var confirmation: SessionConfirmation?
     let onConfirm: (SessionConfirmation) -> Void
+    /// Opens the review of the newest finished set. `nil` when there's nothing to look at.
+    var onReview: (() -> Void)?
+
+    private var navigation: ReviewNavigation {
+        ReviewNavigation(
+            previous: onReview.map { ReviewNavigation.Action(title: SessionMessages.reviewSetsButton, perform: $0) })
+    }
 
     var body: some View {
         List {
@@ -25,6 +33,7 @@ struct SessionSummaryView: View {
                     Text(workoutName)
                         .font(.title3)
                         .foregroundStyle(.secondary)
+                        .reviewAccessibilityActions(navigation)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal)
@@ -47,9 +56,26 @@ struct SessionSummaryView: View {
                     Text(line.text).accessibilityLabel(line.spokenText)
                 }
             }
+            if let onReview {
+                Section {
+                    Button(action: onReview) {
+                        HStack {
+                            Text(SessionMessages.reviewSetsButton)
+                            Spacer()
+                            Image(systemName: "chevron.forward")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                                .accessibilityHidden(true)
+                        }
+                    }
+                    .foregroundStyle(.primary)
+                }
+            }
             // Phase 6 adds the "New Records" section here.
         }
         .listStyle(.insetGrouped)
+        .reviewSwipes(navigation)
+        .accessibilityHiddenWhenCovered()
         .bottomActionBar {
             if content.canSave {
                 Button(action: onSave) {
@@ -119,4 +145,11 @@ private func previewContent(
         workoutName: "Push Day", content: previewContent(done: 8, skipped: 1, volume: 4_250, duration: 3_900),
         onSave: {}, onDiscard: {}, onBackToWorkout: {}, confirmation: .constant(nil), onConfirm: { _ in })
         .dynamicTypeSize(.accessibility3)
+}
+
+#Preview("With sets to review") {
+    SessionSummaryView(
+        workoutName: "Push Day", content: previewContent(done: 8, skipped: 1, volume: 4_250, duration: 3_900),
+        onSave: {}, onDiscard: {}, onBackToWorkout: {}, confirmation: .constant(nil), onConfirm: { _ in },
+        onReview: {})
 }

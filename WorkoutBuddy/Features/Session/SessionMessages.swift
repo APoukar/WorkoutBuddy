@@ -22,6 +22,19 @@ nonisolated enum SessionMessages {
     static let cancelButton = "Cancel"
     static let backToWorkoutButton = "Back to Workout"
 
+    // MARK: Review of earlier sets
+
+    static let previousSetButton = "Previous Set"
+    static let reviewSetsButton = "Review Sets"
+    static let previousButton = "Previous"
+    static let nextButton = "Next"
+    /// VoiceOver action for Next while it goes to a newer set.
+    static let nextSetAction = "Next Set"
+    static let backToCurrentSetButton = "Back to Current Set"
+    static let backToSummaryButton = "Back to Summary"
+    static let markAsDoneButton = "Mark as Done"
+    static let markAsSkippedButton = "Mark as Skipped"
+
     // MARK: Positions
 
     /// "Exercise 2 of 5". `index` is zero-based.

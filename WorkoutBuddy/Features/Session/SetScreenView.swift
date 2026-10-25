@@ -3,7 +3,8 @@ import SwiftUI
 /// The set screen: the exercise, the big reps and kg controls pre-filled for this set, a small "Next"
 /// preview and the pinned Done and Skip Set buttons. Takes plain values and callbacks only. The reps
 /// and kg are view state until Done and reset for each new set. Done and Skip report the ID of the set
-/// they were shown for, so a stale screen can't act on a later set.
+/// they were shown for, so a stale screen can't act on a later set. When earlier sets can be looked at,
+/// a Previous Set button (and a swipe right) opens the review.
 struct SetScreenView: View {
     let workoutName: String
     let timer: ElapsedTimerInfo
@@ -18,6 +19,10 @@ struct SetScreenView: View {
     let onDone: (_ setID: UUID, _ reps: Int, _ kg: Double) -> Void
     let onSkip: (_ setID: UUID) -> Void
     let onPause: () -> Void
+    /// Opens the review of the newest earlier set. `nil` when there's nothing to look at.
+    var onReviewPrevious: (() -> Void)?
+    /// The swipe is off while paused.
+    var isPaused = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -32,14 +37,20 @@ struct SetScreenView: View {
                 initialKg: initialKg,
                 nextText: nextText,
                 spokenNextText: spokenNextText,
+                navigation: ReviewNavigation(
+                    isEnabled: !isPaused,
+                    previous: onReviewPrevious.map {
+                        ReviewNavigation.Action(title: SessionMessages.previousSetButton, perform: $0)
+                    }),
                 onDone: onDone,
-                onSkip: onSkip)
+                onSkip: onSkip,
+                onReviewPrevious: onReviewPrevious)
             .id(setID)
         }
     }
 }
 
-/// The scrolling content and the pinned buttons. Holds the edited reps and kg.
+/// The editable content and the pinned buttons. Holds the edited reps and kg.
 private struct SetEditor: View {
     let setID: UUID
     let exerciseName: String
@@ -47,8 +58,10 @@ private struct SetEditor: View {
     let spokenPosition: String
     let nextText: String
     let spokenNextText: String
+    let navigation: ReviewNavigation
     let onDone: (UUID, Int, Double) -> Void
     let onSkip: (UUID) -> Void
+    let onReviewPrevious: (() -> Void)?
 
     @State private var reps: Int
     @State private var kg: Double
@@ -56,7 +69,9 @@ private struct SetEditor: View {
     init(
         setID: UUID, exerciseName: String, position: String, spokenPosition: String,
         initialReps: Int, initialKg: Double, nextText: String, spokenNextText: String,
-        onDone: @escaping (UUID, Int, Double) -> Void, onSkip: @escaping (UUID) -> Void
+        navigation: ReviewNavigation,
+        onDone: @escaping (UUID, Int, Double) -> Void, onSkip: @escaping (UUID) -> Void,
+        onReviewPrevious: (() -> Void)?
     ) {
         self.setID = setID
         self.exerciseName = exerciseName
@@ -64,39 +79,33 @@ private struct SetEditor: View {
         self.spokenPosition = spokenPosition
         self.nextText = nextText
         self.spokenNextText = spokenNextText
+        self.navigation = navigation
         self.onDone = onDone
         self.onSkip = onSkip
+        self.onReviewPrevious = onReviewPrevious
         _reps = State(initialValue: initialReps)
         _kg = State(initialValue: initialKg)
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(exerciseName)
-                        .font(.largeTitle.bold())
-                        .accessibilityAddTraits(.isHeader)
-                    Text(position)
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel(spokenPosition)
+        SetEditorContent(
+            exerciseName: exerciseName, position: position, spokenPosition: spokenPosition,
+            reps: $reps, kg: $kg, navigation: navigation
+        ) {
+            if let onReviewPrevious {
+                Button(action: onReviewPrevious) {
+                    Label(SessionMessages.previousSetButton, systemImage: "chevron.backward")
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                LargeRepsControl(reps: $reps)
-                LargeWeightControl(kg: $kg)
-
-                Text(nextText)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityLabel(spokenNextText)
+                .buttonStyle(.bordered)
+                .controlSize(.large)
             }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
+        } footer: {
+            Text(nextText)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityLabel(spokenNextText)
         }
-        .scrollDismissesKeyboard(.interactively)
         .bottomActionBar {
             Button {
                 onDone(setID, reps, kg)
@@ -172,4 +181,18 @@ private struct SetEditor: View {
         spokenNextText: "Next: set 2, 10 reps at 62.5 kilograms",
         onDone: { _, _, _ in }, onSkip: { _ in }, onPause: {})
         .dynamicTypeSize(.accessibility3)
+}
+
+#Preview("With earlier sets") {
+    SetScreenView(
+        workoutName: "Push Day",
+        timer: ElapsedTimerInfo(startedAt: .now.addingTimeInterval(-754), pausedDuration: 0, pausedAt: nil),
+        setID: UUID(),
+        exerciseName: "Bench Press",
+        position: "Exercise 1 of 3 · Set 2 of 3",
+        spokenPosition: "Exercise 1 of 3, set 2 of 3",
+        initialReps: 10, initialKg: 62.5,
+        nextText: "Next: Set 3 · 10 × 62.5 kg",
+        spokenNextText: "Next: set 3, 10 reps at 62.5 kilograms",
+        onDone: { _, _, _ in }, onSkip: { _ in }, onPause: {}, onReviewPrevious: {})
 }

@@ -230,6 +230,7 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
 - **Phase 5:** history shows `completed` and `endedEarly` sessions only (an `inProgress` one with `endedAt` is waiting for Save). Session names come from `session.workout`, which may be soft-deleted. Use `SessionStats`, `Formatters.duration` and `Formatters.volume`.
 - **Phase 6:** the summary's "New Records" section; PRs computed in `SessionLibrary.finalize` (every save goes through it) and recalculated on delete.
 - ~~**Later (user's call):** an Undo on the summary for an accidental Done on the last set.~~ Done in step 9 (Back to Workout).
+- **UI tidying session (user's plan, after the features are in):** the user isn't keen on the current look. Ideas collected so far: cap the bottom bars' text size or shrink secondary buttons at AX sizes (the review bar with Mark as Done is about 50% of the screen at AX5; the summary bar about 40%); the bordered secondary buttons' contrast over the iOS 18 `.bar` background.
 - **Phase 7:** export includes `pausedAt`, `restEndsAt` (normally `nil` for saved sessions) and `lastActionAt`.
 
 ## Verification
@@ -329,10 +330,10 @@ The user was asleep, so the main session settled these. Each can be revisited.
 3. [Minor] A failed End & Save or Discard during recovery showed the error at the same moment the cover presented → **accepted**: the recovery question stays and comes back after the error alert.
 
 ## Status (2026-10-25, end of the overnight run)
-- Steps 1–8 are implemented, reviewed and committed on `phase-3-session`. Nothing is pushed and no PR is open.
+- Steps 1–8 are implemented, reviewed and committed on `phase-3-session`; steps 9 and 10 were added during the manual check and are committed too. Nothing is pushed and no PR is open.
 - Final runs: the full suite passes on iPhone 17 / iOS 27.0 and on iPhone 16 / iOS 18.2 (430 tests each, counted from the `.xcresult`); the Release build succeeds and contains `RestEnd.caf`.
 - Checked at runtime by reviewers (scripted, not by hand): the whole step 7 flow and the step 8 launch/recovery flow on iOS 27 and 18.2 (see the step 7 and step 8 review notes).
-- **Still to do by the user:** the manual check under "Verification" (real taps, feel of the haptic, sound of the chime, VoiceOver, AX text sizes, iOS 18.2 contrast).
+- **Manual check:** done by the user on 2026-10-25 except the real-device items; see "Manual check results" at the end.
 - **Decisions waiting for the user** (each one is easy to change):
   - Architect finding 4: a workout with no done set is never saved (Discard instead of Save). `FEATURES.md` F3/F5 should say so if agreed.
   - ~~Architect finding 5: no Undo on the summary for an accidental Done on the last set.~~ Added in step 9 (Back to Workout).
@@ -356,3 +357,18 @@ The user was asleep, so the main session settled these. Each can be revisited.
 8. The review view would rebuild the set editor → **accepted**: shared content view.
 9. Review state when the reviewed set goes away → **accepted**: decided by lookup, transition keyed on (screen key, reviewed ID).
 10. **User's decision:** not on the rest screen.
+
+**Step 10 code review, verdict "Approve with fixes", 5 findings, discussed with the user.** The reviewer ran real synthesized swipes (a throwaway XCUITest target in a scratch copy) on iOS 27 and 18.2: swipes and slide directions, vertical swipes / − / + / typing not navigating, swipes off while typing and back after the Done bar, the current set's draft surviving a look back, edits reaching the summary's volume, Mark as Done / Skipped switching Save and Discard, the frozen header from the summary, and swipes ignored while paused.
+1. [Major] VoiceOver could still reach the hidden set screen's Done and Skip Set while reviewing (and, from earlier steps, under the paused overlay) → **accepted**: the whole screen underneath is hidden in both cases.
+2. [Major] At AX sizes the review's bottom bar took 60–75% of the screen → **accepted**: icon-only Previous / Next there.
+3. **User's decision:** ending the workout from a review lands on the summary itself, not in the review.
+4. [Minor] Voice Control input labels for Previous / Next → **accepted**.
+5. [Minor] Three test gaps → **accepted**.
+
+## Manual check results (2026-10-25, by the user on the simulator)
+- iOS 27 (iPhone 17): the main flow (start, set screen with − / + and typed 22,5, rest with chime and auto-advance, Undo, Skip Rest, Skip Set, Pause/Resume); End Workout → summary → Save; Discard from the summary and from the pause screen; recovery after a kill (no flash; Resume; End; Discard with no done set; summary comes back after a kill on it); dark mode; largest text size — **pass**. The user asked for two changes during the check, built as steps 9 and 10, and checked both — **pass**.
+- iOS 18.2 (iPhone 16 Pro): steps 9 and 10 and the general flow — **pass**.
+- **Left for a real device:** VoiceOver (one element per control, Edit Value, countdown label order, the paused overlay trapping focus), the Sound and Haptics toggles and how the haptic feels.
+- **UI look:** the user isn't keen on the current look but wants functionality first; a UI tidying session comes once the features are in.
+
+Step 10 recheck after the fixes (iOS 27): only the top layer is reachable by VoiceOver in every case (checked by walking the real UIKit accessibility tree; XCUITest's element dump turned out to list hidden elements too, so the paused-overlay part of finding 1 had been an artefact). The AX5 bar shrank from about 75% to about 50% with icon-only Previous / Next. Ending from a review lands on the summary. **Approve.**

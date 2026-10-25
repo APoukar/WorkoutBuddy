@@ -51,6 +51,7 @@ A personal iPhone app for planning gym workouts, running them set by set with gu
 - **Skip set:** the set is saved as *skipped* and the next set opens right away (no rest).
 - **Pause:** freezes the overall timer and any rest countdown. A paused overlay offers **Resume** and **End workout**.
 - **End early:** asks for confirmation, then shows the summary (F5); when it's saved, the remaining sets are saved as *not performed*. If no set was completed, the app offers to **discard** the session instead.
+- **Earlier sets:** on the set screen or the summary, swipe right (or tap Previous Set / Review Sets) to look back at finished sets. A done set's reps and kg can be corrected, a skipped set can be marked as done and a done set as skipped; the workout's position and timers don't change.
 - **Robustness:** timers are calculated from stored timestamps, not by counting ticks, so they stay correct in the background. Session progress is saved after every action. If the app is killed, the next launch offers **Resume** or **End** (which shows the summary, where **Save** stores it).
 
 ### F4 — Lock Screen & background

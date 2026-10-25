@@ -330,4 +330,75 @@ struct SessionSnapshotTests {
             statuses: [.done, .pending, .pending], pausedAt: at(900), lastActionAt: at(950), completedAt: [at(60), nil, nil])
         #expect(snapshot.lastActivity == at(900))
     }
+
+    // MARK: Review of earlier sets
+
+    /// One exercise with `statuses.count` sets.
+    private func reviewSnapshot(_ statuses: [SetStatus], endedAt: Date? = nil) -> SessionSnapshot {
+        let entries = statuses.enumerated().map { index, status in
+            SessionSnapshot.Entry(
+                id: UUID(), exerciseIndex: 0, setIndex: index, exerciseID: UUID(),
+                planned: SetValues(reps: 10, kg: 60, restSeconds: 90),
+                actualReps: nil, actualKg: nil, status: status, completedAt: nil)
+        }
+        return SessionSnapshot(startedAt: t0, endedAt: endedAt, exerciseCount: 1, entries: entries)
+    }
+
+    @Test func runningWorkoutReviewsTheDoneAndSkippedSetsBeforeTheCurrentOne() {
+        let snapshot = reviewSnapshot([.done, .skipped, .done, .pending, .pending])
+        #expect(snapshot.reviewableIndices == [0, 1, 2])
+        #expect(snapshot.previousReviewIndex(from: nil) == 2)
+        #expect(snapshot.previousReviewIndex(from: 2) == 1)
+        #expect(snapshot.previousReviewIndex(from: 1) == 0)
+        #expect(snapshot.previousReviewIndex(from: 0) == nil)
+        #expect(snapshot.nextReviewIndex(from: 0) == 1)
+        #expect(snapshot.nextReviewIndex(from: 1) == 2)
+        #expect(snapshot.nextReviewIndex(from: 2) == nil)
+        #expect(snapshot.nextReviewIndex(from: nil) == nil)
+    }
+
+    @Test func nothingIsReviewableOnTheFirstSet() {
+        let snapshot = reviewSnapshot([.pending, .pending])
+        #expect(snapshot.reviewableIndices.isEmpty)
+        #expect(snapshot.previousReviewIndex(from: nil) == nil)
+        #expect(snapshot.nextReviewIndex(from: nil) == nil)
+    }
+
+    @Test func aFinishedWorkoutReviewsEverythingDoneOrSkipped() {
+        let snapshot = reviewSnapshot([.done, .skipped, .done], endedAt: at(100))
+        #expect(snapshot.reviewableIndices == [0, 1, 2])
+        #expect(snapshot.previousReviewIndex(from: nil) == 2)
+    }
+
+    @Test func aWorkoutEndedEarlyNeverReviewsPendingOrNotPerformedSets() {
+        let snapshot = reviewSnapshot([.done, .skipped, .pending, .notPerformed, .pending], endedAt: at(100))
+        #expect(snapshot.reviewableIndices == [0, 1])
+        #expect(snapshot.previousReviewIndex(from: nil) == 1)
+    }
+
+    @Test func reviewSkipsOverNotPerformedSetsBetweenReviewableOnes() {
+        let snapshot = reviewSnapshot([.done, .notPerformed, .notPerformed, .skipped, .notPerformed], endedAt: at(100))
+        #expect(snapshot.reviewableIndices == [0, 3])
+        #expect(snapshot.previousReviewIndex(from: 3) == 0)
+        #expect(snapshot.nextReviewIndex(from: 0) == 3)
+        // From a set that is no longer reviewable, the neighbours are still found.
+        #expect(snapshot.previousReviewIndex(from: 2) == 0)
+        #expect(snapshot.nextReviewIndex(from: 2) == 3)
+    }
+
+    @Test func aWorkoutWithNothingDoneOrSkippedHasNothingToReview() {
+        let snapshot = reviewSnapshot([.pending, .notPerformed], endedAt: at(100))
+        #expect(snapshot.reviewableIndices.isEmpty)
+        #expect(snapshot.previousReviewIndex(from: nil) == nil)
+    }
+
+    @Test func reviewIndexLooksTheSetUpByIDAndOnlyWhileItIsReviewable() {
+        let snapshot = reviewSnapshot([.done, .skipped, .pending, .notPerformed])
+        #expect(snapshot.reviewIndex(ofSetWithID: snapshot.entries[0].id) == 0)
+        #expect(snapshot.reviewIndex(ofSetWithID: snapshot.entries[1].id) == 1)
+        #expect(snapshot.reviewIndex(ofSetWithID: snapshot.entries[2].id) == nil)  // The current set.
+        #expect(snapshot.reviewIndex(ofSetWithID: snapshot.entries[3].id) == nil)
+        #expect(snapshot.reviewIndex(ofSetWithID: UUID()) == nil)
+        #expect(snapshot.reviewIndex(ofSetWithID: nil) == nil)
+    }
 }

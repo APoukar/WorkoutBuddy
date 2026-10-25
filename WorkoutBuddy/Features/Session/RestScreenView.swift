@@ -44,6 +44,7 @@ struct RestScreenView: View {
                 .padding(.horizontal)
                 .padding(.vertical, 8)
             }
+            .accessibilityHiddenWhenCovered()
         }
         .bottomActionBar {
             Button(action: onSkipRest) {

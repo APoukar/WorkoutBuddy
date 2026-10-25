@@ -232,4 +232,18 @@ struct SessionMessagesTests {
         #expect(SessionMessages.pausedTitle == "Paused")
         #expect(SessionMessages.resumeButton == "Resume")
     }
+
+    @Test func reviewLabelsReadAsPlanned() {
+        #expect(SessionMessages.previousSetButton == "Previous Set")
+        #expect(SessionMessages.reviewSetsButton == "Review Sets")
+        #expect(SessionMessages.previousButton == "Previous")
+        #expect(SessionMessages.nextButton == "Next")
+        #expect(SessionMessages.nextSetAction == "Next Set")
+        #expect(SessionMessages.backToCurrentSetButton == "Back to Current Set")
+        #expect(SessionMessages.backToSummaryButton == "Back to Summary")
+        #expect(SessionMessages.markAsDoneButton == "Mark as Done")
+        #expect(SessionMessages.markAsSkippedButton == "Mark as Skipped")
+        #expect(SetStatus.done.displayName == "Done")
+        #expect(SetStatus.skipped.displayName == "Skipped")
+    }
 }
