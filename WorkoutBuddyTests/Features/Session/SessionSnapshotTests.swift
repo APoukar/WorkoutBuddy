@@ -123,6 +123,36 @@ struct SessionSnapshotTests {
         #expect(snapshot.restRemaining(now: at(250)) == nil)
     }
 
+    @Test func expiredRestIsOneThatRanOutAndWasNotCleared() {
+        let snapshot = makeSnapshot(statuses: [.done, .pending, .pending], restEndsAt: at(100))
+        #expect(!snapshot.hasExpiredRest(now: at(99)))
+        #expect(snapshot.hasExpiredRest(now: at(100)))
+        #expect(snapshot.hasExpiredRest(now: at(500)))
+        #expect(!makeSnapshot().hasExpiredRest(now: at(500)))
+    }
+
+    @Test func autoAdvanceDeadlineIsTheRunningRestsEnd() {
+        let snapshot = makeSnapshot(statuses: [.done, .pending, .pending], restEndsAt: at(100))
+        #expect(snapshot.autoAdvanceDeadline == at(100))
+        // Still returned once it has run out but wasn't cleared: it doesn't depend on the time.
+        #expect(makeSnapshot(statuses: [.done, .pending, .pending], restEndsAt: at(-5)).autoAdvanceDeadline == at(-5))
+    }
+
+    @Test func autoAdvanceDeadlineIsNilWhilePausedFinishedOrWithoutARest() {
+        let paused = makeSnapshot(statuses: [.done, .pending, .pending], pausedAt: at(50), restEndsAt: at(100))
+        #expect(paused.autoAdvanceDeadline == nil)
+        let finished = makeSnapshot(statuses: [.done, .done, .done], endedAt: at(60), restEndsAt: at(100))
+        #expect(finished.autoAdvanceDeadline == nil)
+        #expect(makeSnapshot().autoAdvanceDeadline == nil)
+    }
+
+    @Test func expiredRestIsFrozenWhilePausedAndIgnoredOnceFinished() {
+        let paused = makeSnapshot(statuses: [.done, .pending, .pending], pausedAt: at(50), restEndsAt: at(100))
+        #expect(!paused.hasExpiredRest(now: at(500)))
+        let finished = makeSnapshot(statuses: [.done, .done, .done], endedAt: at(60), restEndsAt: at(40))
+        #expect(!finished.hasExpiredRest(now: at(500)))
+    }
+
     @Test func restRemainingIsNilWithoutARest() {
         #expect(makeSnapshot().restRemaining(now: at(10)) == nil)
     }

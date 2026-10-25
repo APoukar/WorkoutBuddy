@@ -249,7 +249,7 @@ struct SessionLibrary {
         try commit {
             session.lastActionAt = now
             let before = snapshot(of: session)
-            if let restEndsAt = before.restEndsAt, restEndsAt <= before.effectiveTime(now: now) {
+            if before.hasExpiredRest(now: now) {
                 session.restEndsAt = nil
             }
             body(snapshot(of: session))

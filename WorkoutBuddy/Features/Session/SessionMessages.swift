@@ -19,6 +19,7 @@ nonisolated enum SessionMessages {
     static let undoButton = "Undo"
     static let pausedTitle = "Paused"
     static let resumeButton = "Resume"
+    static let cancelButton = "Cancel"
 
     // MARK: Positions
 
@@ -99,6 +100,8 @@ nonisolated enum SessionMessages {
 
     /// Used when the exercise reference is gone and no name can be looked up.
     static let fallbackExerciseName = "Exercise"
+    /// Used when the template reference is gone and no workout name can be looked up.
+    static let fallbackWorkoutName = "Workout"
 
     private static func startsNewExercise(at index: Int, in snapshot: SessionSnapshot) -> Bool {
         guard index > 0 else { return true }
@@ -111,6 +114,11 @@ nonisolated enum SessionMessages {
     static func summaryTitle(endedEarly: Bool) -> String {
         endedEarly ? "Workout Ended" : "Workout Complete"
     }
+
+    static let saveButton = "Save"
+    static let durationLabel = "Duration"
+    static let setsLabel = "Sets"
+    static let volumeLabel = "Volume"
 
     /// "8 completed". Singular and plural read the same.
     static func completedText(_ count: Int) -> String { "\(count) completed" }

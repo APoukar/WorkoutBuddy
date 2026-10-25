@@ -71,6 +71,19 @@ nonisolated struct SessionSnapshot: Equatable, Sendable {
         return Int(remaining.rounded(.up))
     }
 
+    /// A rest that has run out but hasn't been cleared yet (the app was in the background, say).
+    func hasExpiredRest(now: Date) -> Bool {
+        guard !isFinished, let restEndsAt else { return false }
+        return restEndsAt <= effectiveTime(now: now)
+    }
+
+    /// When the foreground auto-advance should clear the rest: `restEndsAt`, but never while paused or
+    /// finished (a paused rest is frozen and a finished workout has no rest). `nil` when there's nothing to wait for.
+    var autoAdvanceDeadline: Date? {
+        guard !isPaused, !isFinished else { return nil }
+        return restEndsAt
+    }
+
     // MARK: State
 
     var isFinished: Bool { endedAt != nil }

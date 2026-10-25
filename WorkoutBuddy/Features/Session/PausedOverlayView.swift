@@ -2,11 +2,15 @@ import SwiftUI
 
 /// The overlay shown over the set or rest screen while the workout is paused: a dimmed material, the
 /// frozen elapsed time and the pinned Resume and End Workout buttons. Takes plain values and callbacks
-/// only. End Workout only reports the tap; the owner asks for confirmation. Traps VoiceOver focus.
+/// only. End Workout only reports the tap; the owner decides what to ask and keeps the state. The
+/// confirmation dialog is anchored to the End Workout button. Traps VoiceOver focus.
 struct PausedOverlayView: View {
     let timer: ElapsedTimerInfo
     let onResume: () -> Void
     let onEnd: () -> Void
+    /// The question being asked, owned by the caller.
+    @Binding var confirmation: SessionConfirmation?
+    let onConfirm: (SessionConfirmation) -> Void
 
     var body: some View {
         ZStack {
@@ -42,6 +46,7 @@ struct PausedOverlayView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
+            .sessionConfirmation($confirmation, onConfirm: onConfirm)
         }
         .accessibilityAddTraits(.isModal)
     }
@@ -50,7 +55,7 @@ struct PausedOverlayView: View {
 #Preview("Paused") {
     PausedOverlayView(
         timer: ElapsedTimerInfo(startedAt: .now.addingTimeInterval(-754), pausedDuration: 0, pausedAt: .now),
-        onResume: {}, onEnd: {})
+        onResume: {}, onEnd: {}, confirmation: .constant(nil), onConfirm: { _ in })
 }
 
 #Preview("Paused over a screen") {
@@ -68,13 +73,13 @@ struct PausedOverlayView: View {
             onDone: { _, _, _ in }, onSkip: { _ in }, onPause: {})
         PausedOverlayView(
             timer: ElapsedTimerInfo(startedAt: .now.addingTimeInterval(-754), pausedDuration: 0, pausedAt: .now),
-            onResume: {}, onEnd: {})
+            onResume: {}, onEnd: {}, confirmation: .constant(nil), onConfirm: { _ in })
     }
 }
 
 #Preview("Accessibility text size") {
     PausedOverlayView(
         timer: ElapsedTimerInfo(startedAt: .now.addingTimeInterval(-3_754), pausedDuration: 120, pausedAt: .now),
-        onResume: {}, onEnd: {})
+        onResume: {}, onEnd: {}, confirmation: .constant(nil), onConfirm: { _ in })
         .dynamicTypeSize(.accessibility3)
 }

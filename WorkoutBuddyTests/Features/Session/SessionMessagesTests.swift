@@ -168,6 +168,15 @@ struct SessionMessagesTests {
         #expect(SessionMessages.cannotSaveNote == "No sets were completed, so this workout can't be saved.")
     }
 
+    @Test func summaryLabels() {
+        #expect(SessionMessages.saveButton == "Save")
+        #expect(SessionMessages.cancelButton == "Cancel")
+        #expect(SessionMessages.durationLabel == "Duration")
+        #expect(SessionMessages.setsLabel == "Sets")
+        #expect(SessionMessages.volumeLabel == "Volume")
+        #expect(SessionMessages.fallbackWorkoutName == "Workout")
+    }
+
     // MARK: Confirmations and recovery
 
     @Test func confirmationTexts() {
