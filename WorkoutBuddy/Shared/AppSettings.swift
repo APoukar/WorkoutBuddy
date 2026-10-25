@@ -47,6 +47,29 @@ nonisolated enum AppSettings {
         static let hapticsEnabled = true
     }
 
+    /// Where every setting is read and written: `.standard`, or in UI-testing mode a separate suite that is
+    /// cleared at launch (unless the test keeps its data) and has Sound and Haptics off, so test runs are
+    /// silent and never touch the user's settings. The app root sets it as the default `@AppStorage` store.
+    /// `nonisolated(unsafe)`: `UserDefaults` is thread-safe but not declared `Sendable`; the value is set once.
+    nonisolated(unsafe) static let store: UserDefaults = {
+        guard let launch = UITestingLaunch.current else { return .standard }
+        return uiTestingStore(suiteName: UITestingContract.settingsSuiteName, keepData: launch.keepData)
+    }()
+
+    /// The UI-testing settings suite. Cleared unless `keepData`, and Sound and Haptics are off after a clear.
+    /// Never falls back to `.standard`: that would write the test's settings into the user's.
+    static func uiTestingStore(suiteName: String, keepData: Bool) -> UserDefaults {
+        guard let suite = UserDefaults(suiteName: suiteName) else {
+            fatalError("UI-testing settings suite '\(suiteName)' could not be created")
+        }
+        if !keepData {
+            suite.removePersistentDomain(forName: suiteName)
+            suite.set(false, forKey: Key.soundEnabled)
+            suite.set(false, forKey: Key.hapticsEnabled)
+        }
+        return suite
+    }
+
     static let repsRange = 1...100
     static let kgRange = 0.0...500.0
     static let restRange = 0...600
@@ -79,7 +102,7 @@ nonisolated enum AppSettings {
     }
 
     /// Current settings with missing values defaulted and out-of-range values clamped.
-    static func current(in defaults: UserDefaults = .standard) -> Values {
+    static func current(in defaults: UserDefaults = AppSettings.store) -> Values {
         let reps = defaults.object(forKey: Key.defaultReps) as? Int ?? Default.reps
         let kg = defaults.object(forKey: Key.defaultKg) as? Double ?? Default.kg
         let rest = defaults.object(forKey: Key.defaultRestSeconds) as? Int ?? Default.restSeconds

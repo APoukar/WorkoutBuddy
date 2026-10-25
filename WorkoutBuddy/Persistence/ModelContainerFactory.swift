@@ -32,13 +32,24 @@ enum ModelContainerFactory {
         }
     }
 
-    #if targetEnvironment(simulator)
-    private static func deleteStoreFiles(at url: URL) {
+    /// The UI-testing disk store: its own file in the temporary directory, never the real `default.store`.
+    static var uiTestingStoreURL: URL {
+        FileManager.default.temporaryDirectory.appending(path: "UITesting.store")
+    }
+
+    /// Builds the UI-testing disk store at `uiTestingStoreURL`. Its files are deleted first unless `keepData`.
+    static func makeUITestingDiskStore(keepData: Bool) throws -> ModelContainer {
+        let url = uiTestingStoreURL
+        if !keepData { deleteStoreFiles(at: url) }
+        let schema = Schema(versionedSchema: SchemaV1.self)
+        return try ModelContainer(for: schema, configurations: [ModelConfiguration(schema: schema, url: url)])
+    }
+
+    static func deleteStoreFiles(at url: URL) {
         let fileManager = FileManager.default
         for suffix in ["", "-wal", "-shm"] {
             let file = URL(fileURLWithPath: url.path + suffix)
             try? fileManager.removeItem(at: file)
         }
     }
-    #endif
 }

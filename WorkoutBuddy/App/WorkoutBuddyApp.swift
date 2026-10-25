@@ -7,8 +7,16 @@ struct WorkoutBuddyApp: App {
 
     init() {
         do {
-            // Tests never touch the real store.
-            container = try ModelContainerFactory.make(inMemory: ModelContainerFactory.isRunningTests)
+            if let launch = UITestingLaunch.current {
+                // UI tests never touch the real store either.
+                switch launch.store {
+                case .memory: container = try ModelContainerFactory.make(inMemory: true)
+                case .disk: container = try ModelContainerFactory.makeUITestingDiskStore(keepData: launch.keepData)
+                }
+            } else {
+                // Unit tests never touch the real store.
+                container = try ModelContainerFactory.make(inMemory: ModelContainerFactory.isRunningTests)
+            }
         } catch {
             fatalError("WorkoutBuddy could not create its data store: \(error)")
         }
@@ -18,6 +26,7 @@ struct WorkoutBuddyApp: App {
     var body: some Scene {
         WindowGroup {
             RootTabView()
+                .defaultAppStorage(AppSettings.store)
         }
         .modelContainer(container)
     }
