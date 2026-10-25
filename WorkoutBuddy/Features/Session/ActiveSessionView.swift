@@ -146,6 +146,7 @@ struct ActiveSessionView: View {
                 content: SessionSummaryContent(SessionStats(snapshot, now: now)),
                 onSave: { run("Save workout") { try $0.save($1) } },
                 onDiscard: { confirmation = .discard },
+                onBackToWorkout: { run("Back to workout") { try $0.backToWorkout(in: $1) } },
                 confirmation: $confirmation,
                 onConfirm: confirm)
         }

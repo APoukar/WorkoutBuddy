@@ -3,7 +3,7 @@ import SwiftData
 import Testing
 @testable import WorkoutBuddy
 
-/// Pause, resume, end early, discard, save and End & Save of `SessionLibrary`.
+/// Pause, resume, end early, back to workout, discard, save and End Workout for recovery of `SessionLibrary`.
 @MainActor
 struct SessionLibraryEndTests {
     private let t0 = SessionFixture.t0
@@ -124,13 +124,13 @@ struct SessionLibraryEndTests {
 
     // MARK: End early
 
-    @Test func endEarlyMarksPendingSetsNotPerformedAndFinishes() throws {
+    @Test func endEarlyKeepsPendingSetsPendingAndFinishes() throws {
         let f = try makeFixture()
         try f.lib.completeSet(in: f.session, setID: f.ids[0], reps: 12, kg: 65, now: t0 + 10)  // rest running
         try f.lib.endEarly(in: f.session, now: t0 + 20)
 
         let snapshot = f.snapshot
-        #expect(snapshot.entries.map(\.status) == [.done, .notPerformed, .notPerformed])
+        #expect(snapshot.entries.map(\.status) == [.done, .pending, .pending])
         #expect(snapshot.entries[0].actualReps == 12)
         #expect(snapshot.entries[1].completedAt == nil)
         #expect(f.session.endedAt == t0 + 20)
@@ -139,10 +139,12 @@ struct SessionLibraryEndTests {
         #expect(f.session.status == .inProgress)  // Waiting for Save.
         #expect(snapshot.screen(now: t0 + 500) == .summary)
         #expect(SessionStats(snapshot, now: t0 + 500).duration == 20)
+        // Pending sets count as not performed on the summary, before anything is final.
+        #expect(SessionStats(snapshot, now: t0 + 500).notPerformedCount == 2)
         try expectPersisted(f)
     }
 
-    @Test func endEarlyClearsActualValuesLeftOnPendingSets() throws {
+    @Test func endEarlyKeepsActualValuesLeftOnPendingSets() throws {
         let f = try makeFixture()
         try f.lib.completeSet(in: f.session, setID: f.ids[0], reps: 10, kg: 60, now: t0 + 10)
         try f.lib.skipRest(in: f.session, now: t0 + 11)
@@ -154,9 +156,19 @@ struct SessionLibraryEndTests {
         try f.lib.endEarly(in: f.session, now: t0 + 30)
 
         let entries = f.snapshot.entries
-        #expect(entries.map(\.status) == [.done, .notPerformed, .notPerformed])
-        #expect(entries[2].actualReps == nil)
-        #expect(entries[2].actualKg == nil)
+        #expect(entries.map(\.status) == [.done, .pending, .pending])
+        #expect(entries[2].actualReps == 7)
+        #expect(entries[2].actualKg == 90)
+
+        // Save is what marks them not performed and clears the values.
+        try f.lib.save(f.session)
+        let saved = f.snapshot.entries
+        #expect(saved.map(\.status) == [.done, .notPerformed, .notPerformed])
+        #expect(saved[2].actualReps == nil)
+        #expect(saved[2].actualKg == nil)
+        #expect(saved[2].completedAt == nil)
+        #expect(f.session.status == .endedEarly)
+        try expectPersisted(f)
     }
 
     @Test func endEarlyWhilePausedDoesNotSubtractThePauseTwice() throws {
@@ -307,6 +319,7 @@ struct SessionLibraryEndTests {
         try f.lib.save(f.session)
 
         #expect(f.session.status == .endedEarly)
+        #expect(f.snapshot.entries.map(\.status) == [.done, .notPerformed, .notPerformed])
         #expect(try f.lib.activeSession() == nil)
         #expect(WorkoutLibrary(context: f.context).lastPerformed(f.workout) == t0)
         try expectPersisted(f)
@@ -377,96 +390,215 @@ struct SessionLibraryEndTests {
         #expect(f.session.status == .completed)
     }
 
-    // MARK: End & Save
+    // MARK: End Workout for recovery
 
-    @Test func endAndSaveEndsAtTheLatestDoneSet() throws {
+    @Test func endForRecoveryEndsAtTheLatestDoneSetAndWaitsForSave() throws {
         let f = try makeFixture()
         try f.lib.completeSet(in: f.session, setID: f.ids[0], reps: 10, kg: 60, now: t0 + 10)  // rest running
-        try f.lib.endAndSave(f.session)
+        try f.lib.endForRecovery(f.session)
 
         #expect(f.session.endedAt == t0 + 10)
-        #expect(f.session.status == .endedEarly)
+        #expect(f.session.status == .inProgress)  // Waiting for Save on the summary.
         #expect(f.session.restEndsAt == nil)
         #expect(f.session.pausedAt == nil)
+        #expect(f.snapshot.entries.map(\.status) == [.done, .pending, .pending])
+        #expect(f.snapshot.screen(now: t0 + 9999) == .summary)
+        #expect(try f.lib.activeSession()?.id == f.session.id)
+        #expect(WorkoutLibrary(context: f.context).lastPerformed(f.workout) == nil)
+        #expect(LaunchRecovery.decide(f.snapshot) == .showSummary)
+        try expectPersisted(f)
+
+        try f.lib.save(f.session)
+        #expect(f.session.status == .endedEarly)
         #expect(f.snapshot.entries.map(\.status) == [.done, .notPerformed, .notPerformed])
         #expect(try f.lib.activeSession() == nil)
         #expect(WorkoutLibrary(context: f.context).lastPerformed(f.workout) == t0)
         try expectPersisted(f)
     }
 
-    @Test func endAndSaveEndsAtALaterSkippedSet() throws {
+    @Test func endForRecoveryEndsAtALaterSkippedSet() throws {
         let f = try makeFixture()
         try f.lib.completeSet(in: f.session, setID: f.ids[0], reps: 10, kg: 60, now: t0 + 10)
         try f.lib.skipRest(in: f.session, now: t0 + 12)
         try f.lib.skipSet(in: f.session, setID: f.ids[1], now: t0 + 50)
-        try f.lib.endAndSave(f.session)
+        try f.lib.endForRecovery(f.session)
 
         #expect(f.session.endedAt == t0 + 50)
+        #expect(f.snapshot.entries.map(\.status) == [.done, .skipped, .pending])
+        try f.lib.save(f.session)
         #expect(f.session.status == .endedEarly)
         #expect(f.snapshot.entries.map(\.status) == [.done, .skipped, .notPerformed])
     }
 
-    @Test func endAndSaveEndsAtThePauseWhenPausedAndKeepsEarlierPauses() throws {
+    @Test func endForRecoveryEndsAtThePauseWhenPausedAndKeepsEarlierPauses() throws {
         let f = try makeFixture()
         try f.lib.pause(in: f.session, now: t0 + 20)
         try f.lib.resume(in: f.session, now: t0 + 50)
         try f.lib.completeSet(in: f.session, setID: f.ids[0], reps: 10, kg: 60, now: t0 + 60)
         try f.lib.pause(in: f.session, now: t0 + 80)
-        try f.lib.endAndSave(f.session)
+        try f.lib.endForRecovery(f.session)
 
         #expect(f.session.endedAt == t0 + 80)
         #expect(f.session.pausedAt == nil)
         #expect(f.session.pausedDuration == 30)
-        #expect(f.session.status == .endedEarly)
+        #expect(f.session.status == .inProgress)
         #expect(SessionStats(f.snapshot, now: t0 + 9999).duration == 50)
         try expectPersisted(f)
     }
 
-    @Test func endAndSaveCountsAPauseAndResumeAfterTheLastDoneSet() throws {
+    @Test func endForRecoveryCountsAPauseAndResumeAfterTheLastDoneSet() throws {
         // Started 9:50, Done A 10:00, paused 10:05, resumed 10:30, then the app was killed.
         let f = try makeFixture()
         try f.lib.completeSet(in: f.session, setID: f.ids[0], reps: 10, kg: 60, now: t0 + 600)
         try f.lib.pause(in: f.session, now: t0 + 900)
         try f.lib.resume(in: f.session, now: t0 + 2400)
-        try f.lib.endAndSave(f.session)
+        try f.lib.endForRecovery(f.session)
 
         #expect(f.session.endedAt == t0 + 2400)
         #expect(f.session.pausedDuration == 1500)
-        #expect(f.session.status == .endedEarly)
         #expect(SessionStats(f.snapshot, now: t0 + 9999).duration == 15 * 60)
         try expectPersisted(f)
     }
 
-    @Test func endAndSaveOnTheBadDataCaseEndsAtLastActivity() throws {
+    @Test func endForRecoveryWithNoDoneSetDoesNothing() throws {
+        let f = try makeFixture()
+        try f.lib.skipSet(in: f.session, setID: f.ids[0], now: t0 + 10)
+        let before = f.snapshot
+        try f.lib.endForRecovery(f.session)
+        #expect(f.snapshot == before)
+        #expect(f.session.endedAt == nil)
+    }
+
+    @Test func endForRecoveryOnAFinishedOrSavedSessionDoesNothing() throws {
+        let f = try makeFixture()
+        try completeAll(f)
+        let finished = f.snapshot
+        try f.lib.endForRecovery(f.session)
+        #expect(f.snapshot == finished)
+        try f.lib.save(f.session)
+        let saved = f.snapshot
+        try f.lib.endForRecovery(f.session)
+        #expect(f.snapshot == saved)
+        #expect(f.session.status == .completed)
+    }
+
+    // MARK: Back to Workout
+
+    @Test func backToWorkoutAfterAnEarlyEndKeepsPendingSetsAndExcludesTheSummaryTime() throws {
+        let f = try makeFixture()
+        try f.lib.pause(in: f.session, now: t0 + 5)
+        try f.lib.resume(in: f.session, now: t0 + 15)  // 10 s paused
+        try f.lib.completeSet(in: f.session, setID: f.ids[0], reps: 10, kg: 60, now: t0 + 20)  // rest to t0+110
+        try f.lib.endEarly(in: f.session, now: t0 + 30)
+        try f.lib.backToWorkout(in: f.session, now: t0 + 130)  // 100 s on the summary
+
+        #expect(f.session.endedAt == nil)
+        #expect(f.session.pausedAt == nil)
+        #expect(f.session.restEndsAt == nil)  // The rest isn't restored.
+        #expect(f.session.status == .inProgress)
+        #expect(f.session.pausedDuration == 110)
+        #expect(f.session.lastActionAt == t0 + 130)
+        #expect(f.snapshot.entries.map(\.status) == [.done, .pending, .pending])
+        #expect(f.snapshot.screen(now: t0 + 130) == .set(1))
+        // Elapsed: 130 s since the start, minus 10 s paused and 100 s on the summary.
+        #expect(f.snapshot.elapsed(now: t0 + 130) == 20)
+        #expect(f.snapshot.elapsed(now: t0 + 150) == 40)
+        try expectPersisted(f)
+
+        // The workout carries on, and can be ended and saved again.
+        try f.lib.completeSet(in: f.session, setID: f.ids[1], reps: 8, kg: 62.5, now: t0 + 140)
+        try f.lib.completeSet(in: f.session, setID: f.ids[2], reps: 5, kg: 100, now: t0 + 150)
+        try f.lib.save(f.session)
+        #expect(f.session.status == .completed)
+        #expect(SessionStats(f.snapshot, now: t0 + 9999).duration == 40)
+    }
+
+    @Test func backToWorkoutAfterDoneOnTheLastSetPutsThatSetBackWithItsValues() throws {
+        let f = try makeFixture()
+        try f.lib.completeSet(in: f.session, setID: f.ids[0], reps: 10, kg: 60, now: t0 + 10)
+        try f.lib.skipRest(in: f.session, now: t0 + 11)
+        try f.lib.completeSet(in: f.session, setID: f.ids[1], reps: 8, kg: 62.5, now: t0 + 20)
+        try f.lib.completeSet(in: f.session, setID: f.ids[2], reps: 6, kg: 105, now: t0 + 30)  // Accidental.
+        #expect(f.session.endedAt == t0 + 30)
+        try f.lib.backToWorkout(in: f.session, now: t0 + 50)
+
+        let snapshot = f.snapshot
+        #expect(snapshot.entries.map(\.status) == [.done, .done, .pending])
+        #expect(snapshot.entries[2].actualReps == 6)
+        #expect(snapshot.entries[2].actualKg == 105)
+        #expect(snapshot.entries[2].completedAt == nil)
+        #expect(snapshot.prefill(forSetAt: 2) == (6, 105))
+        #expect(snapshot.screen(now: t0 + 50) == .set(2))
+        #expect(f.session.endedAt == nil)
+        #expect(f.session.pausedDuration == 20)
+        #expect(f.session.restEndsAt == nil)
+        try expectPersisted(f)
+    }
+
+    @Test func backToWorkoutAfterSkipOnTheLastSetPutsThatSetBack() throws {
+        let f = try makeFixture()
+        try f.lib.completeSet(in: f.session, setID: f.ids[0], reps: 10, kg: 60, now: t0 + 10)
+        try f.lib.skipRest(in: f.session, now: t0 + 11)
+        try f.lib.completeSet(in: f.session, setID: f.ids[1], reps: 8, kg: 62.5, now: t0 + 20)
+        try f.lib.skipSet(in: f.session, setID: f.ids[2], now: t0 + 30)
+        try f.lib.backToWorkout(in: f.session, now: t0 + 40)
+
+        #expect(f.snapshot.entries.map(\.status) == [.done, .done, .pending])
+        #expect(f.snapshot.entries[2].completedAt == nil)
+        #expect(f.snapshot.screen(now: t0 + 40) == .set(2))
+        #expect(f.session.pausedDuration == 10)
+    }
+
+    @Test func backToWorkoutAfterEverySetWasSkippedWorksToo() throws {
+        let f = try makeFixture()
+        try skipAll(f)
+        try f.lib.backToWorkout(in: f.session, now: t0 + 10)
+        #expect(f.snapshot.entries.map(\.status) == [.skipped, .skipped, .pending])
+        #expect(f.snapshot.screen(now: t0 + 10) == .set(2))
+    }
+
+    @Test func backToWorkoutIsRefusedOnARunningOrSavedSession() throws {
+        let f = try makeFixture()
+        try f.lib.completeSet(in: f.session, setID: f.ids[0], reps: 10, kg: 60, now: t0 + 10)
+        let running = f.snapshot
+        try f.lib.backToWorkout(in: f.session, now: t0 + 50)
+        #expect(f.snapshot == running)
+
+        try f.lib.endEarly(in: f.session, now: t0 + 60)
+        try f.lib.save(f.session)
+        let saved = f.snapshot
+        try f.lib.backToWorkout(in: f.session, now: t0 + 70)
+        #expect(f.snapshot == saved)
+        #expect(f.session.status == .endedEarly)
+        #expect(f.session.endedAt == t0 + 60)
+    }
+
+    @Test func backToWorkoutOnTheBadDataSummaryTreatsLastActivityAsTheEnd() throws {
         let f = try makeFixture()
         try completeAll(f)
         f.session.endedAt = nil  // Bad data: all sets resolved, `endedAt` lost.
         try f.context.save()
-        let expected = f.snapshot.lastActivity
-        try f.lib.endAndSave(f.session)
+        #expect(LaunchRecovery.decide(f.snapshot) == .showSummary)
+        try f.lib.backToWorkout(in: f.session, now: t0 + 100)
 
-        #expect(f.session.endedAt == expected)
-        #expect(expected == t0 + 30)
-        #expect(f.session.status == .completed)
+        #expect(f.session.endedAt == nil)
         #expect(f.session.pausedAt == nil)
+        #expect(f.session.pausedDuration == 70)  // From the last activity (t0+30) to now.
+        #expect(f.snapshot.entries.map(\.status) == [.done, .done, .pending])
+        #expect(f.snapshot.screen(now: t0 + 100) == .set(2))
+        #expect(f.snapshot.elapsed(now: t0 + 100) == 30)
         try expectPersisted(f)
     }
 
-    @Test func endAndSaveWithNoDoneSetDoesNothing() throws {
+    @Test func backToWorkoutAfterARecoveryEndExcludesTheTimeSinceTheLastActivity() throws {
         let f = try makeFixture()
-        try f.lib.skipSet(in: f.session, setID: f.ids[0], now: t0 + 10)
-        let before = f.snapshot
-        try f.lib.endAndSave(f.session)
-        #expect(f.snapshot == before)
-        #expect(f.session.status == .inProgress)
-    }
+        try f.lib.completeSet(in: f.session, setID: f.ids[0], reps: 10, kg: 60, now: t0 + 10)
+        try f.lib.skipRest(in: f.session, now: t0 + 12)
+        try f.lib.endForRecovery(f.session)  // Ends at t0+12.
+        try f.lib.backToWorkout(in: f.session, now: t0 + 40_000)  // Resumed much later.
 
-    @Test func endAndSaveOnAFinishedSessionOnlySaves() throws {
-        let f = try makeFixture()
-        try completeAll(f)
-        try f.lib.endAndSave(f.session)
-        #expect(f.session.endedAt == t0 + 30)
-        #expect(f.session.status == .completed)
+        #expect(f.session.pausedDuration == 39_988)
+        #expect(f.snapshot.elapsed(now: t0 + 40_000) == 12)
     }
 
     // MARK: Persistence

@@ -33,6 +33,27 @@ struct SessionStatsTests {
         #expect(stats.notPerformedCount == 3)
     }
 
+    @Test func pendingSetsCountAsNotPerformedOnlyInAFinishedSession() {
+        let entries = [entry(.done, reps: 10, kg: 60), entry(.pending), entry(.pending), entry(.notPerformed)]
+        let running = SessionStats(snapshot(entries), now: at(0))
+        #expect(running.notPerformedCount == 1)
+        #expect(!SessionStats(snapshot([entry(.done, reps: 1, kg: 1), entry(.pending)]), now: at(0)).endedEarly)
+
+        let finished = SessionStats(snapshot(entries, endedAt: at(100)), now: at(0))
+        #expect(finished.doneCount == 1)
+        #expect(finished.notPerformedCount == 3)
+        #expect(finished.endedEarly)
+        #expect(SessionStats(snapshot([entry(.done, reps: 1, kg: 1), entry(.pending)], endedAt: at(100)), now: at(0)).endedEarly)
+    }
+
+    @Test func pendingSetsInAFinishedSessionDontAddVolumeOrBlockSaving() {
+        let stats = SessionStats(
+            snapshot([entry(.done, reps: 10, kg: 60), entry(.pending, reps: 7, kg: 90)], endedAt: at(100)), now: at(0))
+        #expect(stats.volume == 600)
+        #expect(stats.canSave)
+        #expect(!SessionStats(snapshot([entry(.skipped), entry(.pending)], endedAt: at(100)), now: at(0)).canSave)
+    }
+
     @Test func volumeSumsActualRepsTimesKg() {
         // 10 x 60 + 8 x 62.5 = 600 + 500
         let stats = SessionStats(snapshot([entry(.done, reps: 10, kg: 60), entry(.done, reps: 8, kg: 62.5)]), now: at(0))

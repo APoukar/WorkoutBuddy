@@ -4,6 +4,8 @@ import Foundation
 nonisolated struct SessionStats: Equatable, Sendable {
     let doneCount: Int
     let skippedCount: Int
+    /// Sets saved as not performed, plus (in a finished workout, which is only waiting for Save) the sets
+    /// still pending: Save marks them not performed.
     let notPerformedCount: Int
     /// Σ actual reps × actual kg over the done sets. Skipped and not-performed sets don't count, and
     /// Bodyweight (0 kg) sets add 0.
@@ -23,7 +25,9 @@ nonisolated struct SessionStats: Equatable, Sendable {
                 volume += Double(entry.actualReps ?? entry.planned.reps) * (entry.actualKg ?? entry.planned.kg)
             case .skipped: skipped += 1
             case .notPerformed: notPerformed += 1
-            case .pending: break
+            case .pending:
+                // In a finished workout the remaining sets will be saved as not performed.
+                if snapshot.isFinished { notPerformed += 1 }
             }
         }
         doneCount = done

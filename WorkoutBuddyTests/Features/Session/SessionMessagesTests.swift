@@ -191,7 +191,8 @@ struct SessionMessagesTests {
     @Test func recoveryTexts() {
         #expect(SessionMessages.recoveryTitle == "Resume Workout?")
         #expect(SessionMessages.recoveryResumeButton == "Resume")
-        #expect(SessionMessages.recoveryEndAndSaveButton == "End & Save")
+        #expect(SessionMessages.recoveryEndButton == "End Workout")
+        #expect(SessionMessages.backToWorkoutButton == "Back to Workout")
         #expect(SessionMessages.recoveryDiscardButton == "Discard")
         #expect(SessionMessages.recoveryMessage(workoutName: "Push Day") == "\u{201C}Push Day\u{201D} was still in progress.")
     }

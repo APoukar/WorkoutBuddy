@@ -189,14 +189,40 @@ struct SessionLibrary {
         }
     }
 
-    /// End Workout: marks the pending sets not performed (clearing actual values an Undo may have left)
-    /// and finishes the workout, which then shows the summary. Does nothing when no set is done:
-    /// such a workout can only be discarded.
+    /// End Workout: finishes the workout, which then shows the summary. The remaining sets stay pending
+    /// (with any actual values an Undo left) until Save marks them not performed, so Back to Workout can
+    /// continue them. Does nothing when no set is done: such a workout can only be discarded.
     func endEarly(in session: WorkoutSession, now: Date = .now) throws {
         try perform(session, now: now) { snapshot in
             guard snapshot.hasDoneSet else { return }
-            markPendingNotPerformed(session)
             finish(session, now: now)
+        }
+    }
+
+    /// Back to Workout, from the summary of a finished, unsaved workout: continues the workout on the set
+    /// screen, not paused. The time spent on the summary doesn't count (it's added to `pausedDuration`).
+    /// If the workout ended by Done or Skip on the last set, that set goes back to pending, keeping its
+    /// actual values and clearing `completedAt`, like Undo. A rest that was running isn't restored.
+    /// Does nothing on a running or saved session.
+    ///
+    /// Bad data only: a session whose sets are all resolved but that has no `endedAt` (the summary shows
+    /// there too) counts as ended at its last activity, like in `save`.
+    func backToWorkout(in session: WorkoutSession, now: Date = .now) throws {
+        guard session.status == .inProgress else { return }
+        let before = snapshot(of: session)
+        guard before.endedAt != nil || before.currentSetIndex == nil else { return }
+        try commit {
+            if before.endedAt == nil { finish(session, now: before.lastActivity) }
+            let endedAt = session.endedAt ?? before.lastActivity
+            session.pausedDuration += max(0, now.timeIntervalSince(endedAt))
+            session.endedAt = nil
+            session.lastActionAt = now
+            if snapshot(of: session).currentSetIndex == nil,
+                let last = session.orderedExercises.flatMap(\.orderedSets).last(where: { $0.status == .done || $0.status == .skipped })
+            {
+                last.status = .pending
+                last.completedAt = nil
+            }
         }
     }
 
@@ -208,8 +234,8 @@ struct SessionLibrary {
         try commit { context.delete(session) }
     }
 
-    /// Save: finalizes a finished session that has a done set. Does nothing without a done set, on a
-    /// session that is still running, or on one that is already saved.
+    /// Save: marks the sets still pending as not performed and finalizes a finished session that has a done
+    /// set. Does nothing without a done set, on a session that is still running, or on one that is already saved.
     ///
     /// Bad data only: a session whose sets are all resolved but that has no `endedAt` is ended at its
     /// last activity first, so the user is never stuck on a summary whose Save does nothing.
@@ -224,19 +250,14 @@ struct SessionLibrary {
         }
     }
 
-    /// End & Save, for recovery after a kill: ends the workout early at its last recorded activity (not
-    /// the launch time) and saves it to history, in one save. Does nothing without a done set.
-    func endAndSave(_ session: WorkoutSession) throws {
-        guard session.status == .inProgress else { return }
+    /// End Workout, for recovery after a kill: finishes the workout at its last recorded activity (not the
+    /// launch time), so the summary opens and Save stores it. Nothing is marked or saved to history yet.
+    /// Does nothing without a done set, or on a session that is already finished or saved.
+    func endForRecovery(_ session: WorkoutSession) throws {
+        guard session.status == .inProgress, session.endedAt == nil else { return }
         let before = snapshot(of: session)
         guard before.hasDoneSet else { return }
-        try commit {
-            if before.endedAt == nil {
-                markPendingNotPerformed(session)
-                finish(session, now: before.lastActivity)
-            }
-            finalize(session)
-        }
+        try commit { finish(session, now: before.lastActivity) }
     }
 
     // MARK: Helpers
@@ -267,9 +288,11 @@ struct SessionLibrary {
         return modelSet(id: setID, in: session)
     }
 
-    /// Sets the final status: ended early if any set was left not performed, else completed.
-    /// Phase 6 adds personal-record detection here, so Save and End & Save both get it.
+    /// Marks the sets still pending as not performed, then sets the final status: ended early if any set
+    /// was left not performed, else completed. Saved sessions never have pending sets.
+    /// Phase 6 adds personal-record detection here.
     private func finalize(_ session: WorkoutSession) {
+        markPendingNotPerformed(session)
         let snapshot = snapshot(of: session)
         let stats = SessionStats(snapshot, now: snapshot.endedAt ?? .now)
         session.status = stats.endedEarly ? .endedEarly : .completed

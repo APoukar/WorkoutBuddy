@@ -20,6 +20,7 @@ nonisolated enum SessionMessages {
     static let pausedTitle = "Paused"
     static let resumeButton = "Resume"
     static let cancelButton = "Cancel"
+    static let backToWorkoutButton = "Back to Workout"
 
     // MARK: Positions
 
@@ -184,7 +185,7 @@ nonisolated enum SessionMessages {
 
     static let recoveryTitle = "Resume Workout?"
     static let recoveryResumeButton = "Resume"
-    static let recoveryEndAndSaveButton = "End & Save"
+    static let recoveryEndButton = "End Workout"
     static let recoveryDiscardButton = "Discard"
 
     /// "“Push Day” was still in progress.", or "Your workout was still in progress." when there's no name

@@ -70,7 +70,7 @@ struct RootTabView: View {
         .alert(SessionMessages.recoveryTitle, isPresented: recoveryAlert, presenting: recovery) { pending in
             Button(SessionMessages.recoveryResumeButton, role: .cancel) { recovery = nil }
             if pending.canSave {
-                Button(SessionMessages.recoveryEndAndSaveButton) { endAndSave(pending) }
+                Button(SessionMessages.recoveryEndButton) { endWorkout(pending) }
             } else {
                 Button(SessionMessages.recoveryDiscardButton, role: .destructive) { discard(pending) }
             }
@@ -106,8 +106,8 @@ struct RootTabView: View {
         }
     }
 
-    private func endAndSave(_ pending: PendingRecovery) {
-        answer(pending, action: "End and save recovered workout") { try library.endAndSave($0) }
+    private func endWorkout(_ pending: PendingRecovery) {
+        answer(pending, action: "End recovered workout") { try library.endForRecovery($0) }
     }
 
     private func discard(_ pending: PendingRecovery) {

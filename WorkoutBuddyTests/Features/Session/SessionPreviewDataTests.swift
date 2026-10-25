@@ -45,11 +45,12 @@ struct SessionPreviewDataTests {
         #expect(stats.canSave && !stats.endedEarly)
     }
 
-    @Test func endedEarlyHasANotPerformedSet() throws {
+    @Test func endedEarlyHasARemainingSetThatSaveWillMarkNotPerformed() throws {
         let (snapshot, _) = try snapshot(.endedEarly)
         #expect(snapshot.screen(now: .now) == .summary)
+        #expect(snapshot.entries.map(\.status) == [.done, .pending])
         let stats = SessionStats(snapshot, now: .now)
-        #expect(stats.canSave && stats.endedEarly)
+        #expect(stats.canSave && stats.endedEarly && stats.notPerformedCount == 1)
     }
 
     @Test func allSkippedCannotBeSaved() throws {

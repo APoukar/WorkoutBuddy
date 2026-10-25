@@ -1,12 +1,12 @@
 import Foundation
 
 /// A session that was interrupted by a kill and needs an answer before the workout is shown: resume it, or
-/// end and save it (discard it when no set is done). Pure, so it can be unit tested.
+/// end it and see the summary (discard it when no set is done). Pure, so it can be unit tested.
 nonisolated struct PendingRecovery: Equatable, Sendable {
     let sessionID: UUID
     /// The workout's name from the reference (soft-deleted or not), `nil` when the reference is gone.
     let workoutName: String?
-    /// Whether a set is done: End & Save is offered, otherwise Discard.
+    /// Whether a set is done: End Workout is offered, otherwise Discard.
     let canSave: Bool
 
     var message: String { SessionMessages.recoveryMessage(workoutName: workoutName) }

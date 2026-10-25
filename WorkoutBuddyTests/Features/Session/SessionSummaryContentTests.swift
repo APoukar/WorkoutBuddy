@@ -39,6 +39,13 @@ struct SessionSummaryContentTests {
         #expect(content.canSave)
     }
 
+    @Test func pendingSetsOfAnEndedWorkoutShowAsNotPerformed() {
+        let content = content([.done, .pending, .pending])
+        #expect(content.title == "Workout Ended")
+        #expect(content.counts.map(\.text) == ["1 completed", "2 not performed"])
+        #expect(content.canSave)
+    }
+
     @Test func workoutWithNoDoneSetCannotBeSaved() {
         let content = content([.skipped, .skipped], duration: 45)
         #expect(!content.canSave)
