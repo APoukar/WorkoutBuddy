@@ -235,13 +235,15 @@ struct SchemaV1Tests {
 
         #expect(session.pausedAt == nil)
         #expect(session.restEndsAt == nil)
+        #expect(session.lastActionAt == nil)
     }
 
     @Test func sessionPauseAndRestFieldsPersistAfterSaveAndFreshFetch() throws {
         let t = try TestContainer()
         let paused = Date(timeIntervalSince1970: 1_000_000)
         let restEnds = Date(timeIntervalSince1970: 1_000_090)
-        let session = WorkoutSession(workout: nil, pausedAt: paused, restEndsAt: restEnds)
+        let lastAction = Date(timeIntervalSince1970: 1_000_050)
+        let session = WorkoutSession(workout: nil, pausedAt: paused, restEndsAt: restEnds, lastActionAt: lastAction)
         t.context.insert(session)
         try t.context.save()
 
@@ -251,9 +253,11 @@ struct SchemaV1Tests {
             try freshContext.fetch(FetchDescriptor<WorkoutSession>(predicate: #Predicate { $0.id == sessionID })).first)
         #expect(fetched.pausedAt == paused)
         #expect(fetched.restEndsAt == restEnds)
+        #expect(fetched.lastActionAt == lastAction)
 
         fetched.pausedAt = nil
         fetched.restEndsAt = nil
+        fetched.lastActionAt = nil
         try freshContext.save()
 
         let again = ModelContext(t.container)
@@ -261,6 +265,7 @@ struct SchemaV1Tests {
             try again.fetch(FetchDescriptor<WorkoutSession>(predicate: #Predicate { $0.id == sessionID })).first)
         #expect(refetched.pausedAt == nil)
         #expect(refetched.restEndsAt == nil)
+        #expect(refetched.lastActionAt == nil)
     }
 
     @Test func settingDefaultsBackToNilPersists() throws {

@@ -136,6 +136,9 @@ nonisolated enum SchemaV1: VersionedSchema {
         var pausedAt: Date?
         /// Set while a rest countdown runs (and, once it has expired, until the next action clears it).
         var restEndsAt: Date?
+        /// When the user last did anything (Done, Skip, Pause, Resume, ...). Used to end an interrupted
+        /// workout at a sensible time. `nil` for a session that was never acted on.
+        var lastActionAt: Date?
         var statusRaw: String = SessionStatus.inProgress.rawValue
 
         @Relationship(deleteRule: .cascade, inverse: \SessionExercise.session)
@@ -153,7 +156,7 @@ nonisolated enum SchemaV1: VersionedSchema {
         init(
             id: UUID = UUID(), workout: Workout?, startedAt: Date = .now, endedAt: Date? = nil,
             pausedDuration: TimeInterval = 0, pausedAt: Date? = nil, restEndsAt: Date? = nil,
-            status: SessionStatus = .inProgress
+            lastActionAt: Date? = nil, status: SessionStatus = .inProgress
         ) {
             self.id = id
             self.workout = workout
@@ -162,6 +165,7 @@ nonisolated enum SchemaV1: VersionedSchema {
             self.pausedDuration = pausedDuration
             self.pausedAt = pausedAt
             self.restEndsAt = restEndsAt
+            self.lastActionAt = lastActionAt
             self.statusRaw = status.rawValue
         }
     }

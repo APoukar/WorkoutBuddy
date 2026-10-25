@@ -25,6 +25,7 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
 - **One state machine, stored on the models.** The session's progress lives entirely in SwiftData, saved after every action, so a killed app resumes exactly where it was. Two fields are added to `WorkoutSession` (schema V1 is still edited in place; no data is on a device yet):
   - `pausedAt: Date?` — set while the workout is paused.
   - `restEndsAt: Date?` — set while a rest countdown runs (and, after it expires, until the next action clears it).
+  - `lastActionAt: Date?` — when the last action ran (added in the step 4 review), so End & Save can end a recovered workout at the right time.
   Everything else is derived: the current set is the **first pending set** in order (sets are always done in order); the session is **resting** when `restEndsAt` is later than the effective time; it is **finished** (waiting for Save on the summary) when `endedAt` is set while the status is still `inProgress`.
 - **Effective time.** All derived values are computed at `endedAt ?? pausedAt ?? now`, so a finished or paused workout is frozen. Elapsed time = effective time − `startedAt` − `pausedDuration`. Rest remaining = `restEndsAt` − effective time, rounded **up** to whole seconds, so the countdown reads 0:01 until it really ends.
 - **Pause and resume.** Pause sets `pausedAt = now`. Resume adds `now − pausedAt` to `pausedDuration` and, if a rest is still running, moves `restEndsAt` later by the same amount, then clears `pausedAt`. Pausing is possible on the set screen and the rest screen.
@@ -49,7 +50,7 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
 - **Only one active session.** "Active" means status `inProgress` (running or waiting for Save). `SessionLibrary.start` refuses to start while one exists. In the UI the full-screen session covers everything, so the user can't reach Start Workout anyway.
 - **Start refuses** a soft-deleted template and one that can't start (`WorkoutLibrary.canStart`). It copies the template's rows that have an exercise, in order, with their planned numbers (`SessionSet.planned…`). Names are never copied.
 - **Recovery after the app was killed.** On launch, an active session that is running (no `endedAt`) is not shown straight away. An alert asks first: "Resume Workout?" / "“Push Day” was still in progress." (or "Your workout was still in progress." if the template reference is gone) with **Resume** and **End & Save**; when no set is `done`, the second button is **Discard** (destructive) instead. A session waiting for Save on launch reopens its summary without asking.
-  - **End & Save** ends the workout early and saves it straight to history (`endedEarly`), without the summary. Its `endedAt` is the **last recorded activity** (`pausedAt` if paused, else the latest `completedAt` of a done or skipped set, else `startedAt`), not the launch time, so a workout recovered the next morning doesn't last 14 hours. A running pause is folded in up to that time.
+  - **End & Save** ends the workout early and saves it straight to history (`endedEarly`), without the summary. Its `endedAt` is the **last recorded activity** (`pausedAt` if paused, else the latest of `lastActionAt`, the `completedAt` of done or skipped sets, and `startedAt`), not the launch time, so a workout recovered the next morning doesn't last 14 hours. A running pause is folded in up to that time.
   - "On launch" means once per process: a session found running when the app process starts was interrupted. The "launch check done" flag lives in a process-wide static and starts `false`; the cover isn't presented until the check has run, so it can't flash up before the alert (architect finding 11).
 - **Save and End & Save share one `finalize`** that sets the final status. Phase 6 hooks PR detection into it, so sessions saved either way get their records (architect finding 12).
 - **No undo from the summary** (architect finding 5, kept as the §6 default). An accidental Done on the last set, or on a set with 0 rest, can't be undone. Offered to the user as a possible later addition.
@@ -91,7 +92,7 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
     - `screen(now:) -> SessionScreen`: `.set(index)`, `.rest(index of the next set, remaining)`, `.summary`. A rest whose next set doesn't exist can't happen (the workout finishes instead), but if the data says so, show `.summary` when finished or the set screen otherwise.
     - `undoTargetIndex(now:)`: the done set right before the current set, only while resting.
     - `prefill(forSetAt:) -> (reps: Int, kg: Double)`: actual values if present, else planned.
-    - `lastActivity`: `pausedAt`, else the latest `completedAt` of a done or skipped set, else `startedAt`.
+    - `lastActivity`: `pausedAt`, else the latest `completedAt` of a done or skipped set, else `startedAt`. (Step 4 review: also `lastActionAt`, see the decisions.)
 - `SchemaV1.SessionSet.completedAt` gets a comment: "when the set was resolved (done or skipped)".
 - Tests (`SessionSnapshotTests`), no SwiftData, fixed dates:
   - elapsed: running, paused (frozen), after resume with `pausedDuration`, finished (frozen at `endedAt`, even if `pausedAt` were left set), never negative
@@ -142,7 +143,7 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
 - `save(_:)`: on a finished session with a done set, calls `finalize`; refuses (no-op) without a done set.
 - `endAndSave(_:)` for recovery: ends early at `lastActivity` (clearing `pausedAt` and the rest) and calls `finalize`, committed in one `save()`.
 - private `finalize(_:)`: sets the status from `SessionStats.endedEarly`. Phase 6 adds PR detection here.
-- `Features/Session/LaunchRecovery.swift` (`nonisolated`): `decide(snapshot) -> .none / .askResume(canSave: Bool) / .showSummary`. A session with no pending set but no `endedAt` (only bad data can produce it) counts as `.showSummary`, and `save` first sets its `endedAt` to `lastActivity`, so the user is never stuck (step 1 review).
+- `Features/Session/LaunchRecovery.swift` (`nonisolated`): `decide(snapshot) -> .nothingToRecover / .askResume(canSave: Bool) / .showSummary`. A session with no pending set but no `endedAt` (only bad data can produce it) counts as `.showSummary`, and `save` first sets its `endedAt` to `lastActivity`, so the user is never stuck (step 1 review).
 - Tests:
   - pause freezes elapsed and rest remaining; resume adds to `pausedDuration` and shifts `restEndsAt`; pause after the rest expired and resume later doesn't bring the rest back
   - end early while paused: not paused afterwards (`pausedAt == nil`, `isPaused` false), and the duration equals the active time only (the pause isn't subtracted twice)
@@ -194,7 +195,7 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
 - **Phase 5:** history shows `completed` and `endedEarly` sessions only (an `inProgress` one with `endedAt` is waiting for Save). Session names come from `session.workout`, which may be soft-deleted. Use `SessionStats`, `Formatters.duration` and `Formatters.volume`.
 - **Phase 6:** the summary's "New Records" section; PRs computed in `SessionLibrary.finalize` (used by both Save and End & Save) and recalculated on delete.
 - **Later (user's call):** an Undo on the summary for an accidental Done on the last set.
-- **Phase 7:** export includes `pausedAt` and `restEndsAt` (normally `nil` for saved sessions).
+- **Phase 7:** export includes `pausedAt`, `restEndsAt` (normally `nil` for saved sessions) and `lastActionAt`.
 
 ## Verification
 - Each step: the CLAUDE.md build and test commands on iPhone 17 / OS 27.0 come out green, the tests also pass on iPhone 16 / OS 18.2 (with `-parallel-testing-enabled NO` if the clone fails), and `code-reviewer` reviews the step. Run the Release build locally for steps that touch previews.
@@ -254,3 +255,11 @@ The user was asleep, so the main session settled these. Each can be revisited.
 2. A test name promised a pause fold it couldn't reach → **accepted**: renamed; step 4's "end early while paused" covers the fold.
 3. The last-set test didn't check the `endedAt` value → **accepted**.
 4. The doc comment overstated the paused guard → **accepted**: names the set actions exactly.
+
+**Step 4 code review, verdict "Approve with fixes", 5 findings:**
+1. End & Save after a pause and resume that came after the last done set ended the workout too early, down to a 0-second duration → **accepted option (a)**: new `WorkoutSession.lastActionAt`, stamped by `start` and every action; `lastActivity` = `pausedAt` if paused, else the latest of `lastActionAt`, the set `completedAt`s and `startedAt`. `FEATURES.md` §4 lists the field.
+2. `LaunchRecovery.none` clashes with `Optional.none` → **accepted**: renamed `.nothingToRecover`.
+3. `discard` could delete a saved session → **accepted**: only in-progress sessions; history delete is a separate phase 5 operation.
+4. Duplicated save/rollback code and test fixture → **accepted**: `commit` reused; shared `SessionFixture` for the session tests.
+   - Follow-on (main session): every call that reaches `perform` stamps `lastActionAt`, including no-op taps (a stale ID, Done while paused). A tap still shows the user was there, so that's accepted; the "changes nothing" tests compare snapshots without `lastActionAt`.
+5. End & Save on the bad-data case untested → **accepted**: test added; it saves as `completed`, because no set is left pending (only a caller bug reaches it; recovery shows the summary there).

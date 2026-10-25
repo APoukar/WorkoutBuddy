@@ -5,57 +5,24 @@ import Testing
 
 @MainActor
 struct SessionLibraryTests {
-    private let t0 = Date(timeIntervalSince1970: 1_000_000)
-    /// Bench: A (10 x 60, rest 90), B (8 x 62.5, rest 0). Squat: C (5 x 100, rest 120).
-    private let setA = SetValues(reps: 10, kg: 60, restSeconds: 90)
-    private let setB = SetValues(reps: 8, kg: 62.5, restSeconds: 0)
-    private let setC = SetValues(reps: 5, kg: 100, restSeconds: 120)
+    private let t0 = SessionFixture.t0
+    private let setA = SessionFixture.setA
+    private let setB = SessionFixture.setB
+    private let setC = SessionFixture.setC
 
-    private struct Fixture {
-        let tc: TestContainer
-        let lib: SessionLibrary
-        let bench: Exercise
-        let squat: Exercise
-        let workout: Workout
-        var context: ModelContext { tc.context }
-    }
-
-    private func makeFixture() throws -> Fixture {
-        let tc = try TestContainer()
-        let bench = Exercise(name: "Bench Press", muscleGroup: .chest)
-        let squat = Exercise(name: "Back Squat", muscleGroup: .legs)
-        tc.context.insert(bench)
-        tc.context.insert(squat)
-        try tc.context.save()
-        let draft = WorkoutDraft(
-            name: "Push Day",
-            exercises: [
-                DraftExercise(exerciseID: bench.id, sets: [DraftSet(values: setA), DraftSet(values: setB)]),
-                DraftExercise(exerciseID: squat.id, sets: [DraftSet(values: setC)]),
-            ])
-        let workout = try WorkoutLibrary(context: tc.context).save(draft, to: nil, now: t0)
-        return Fixture(tc: tc, lib: SessionLibrary(context: tc.context), bench: bench, squat: squat, workout: workout)
-    }
+    private func makeFixture() throws -> SessionFixture { try SessionFixture.make() }
 
     /// A started session plus its set IDs in order (A, B, C).
-    private func started(_ f: Fixture, at now: Date? = nil) throws -> (WorkoutSession, [UUID]) {
-        let session = try f.lib.start(f.workout, now: now ?? t0)
-        return (session, f.lib.snapshot(of: session).entries.map(\.id))
+    private func started(_ f: SessionFixture, at now: Date? = nil) throws -> (WorkoutSession, [UUID]) {
+        try f.start(at: now ?? t0)
     }
 
     private func modelSets(_ session: WorkoutSession) -> [SessionSet] {
         session.orderedExercises.flatMap(\.orderedSets)
     }
 
-    /// Whether what's in the store (read through a fresh context) equals the session's snapshot.
-    private func expectPersisted(_ f: Fixture, _ session: WorkoutSession, sourceLocation: SourceLocation = #_sourceLocation) throws {
-        let fresh = ModelContext(f.tc.container)
-        let sessionID = session.id
-        let fetched = try fresh.fetch(FetchDescriptor<WorkoutSession>(predicate: #Predicate { $0.id == sessionID }))
-        let reloaded = try #require(fetched.first, sourceLocation: sourceLocation)
-        #expect(
-            SessionLibrary(context: fresh).snapshot(of: reloaded) == f.lib.snapshot(of: session),
-            sourceLocation: sourceLocation)
+    private func expectPersisted(_ f: SessionFixture, _ session: WorkoutSession, sourceLocation: SourceLocation = #_sourceLocation) throws {
+        try f.expectPersisted(session, sourceLocation: sourceLocation)
     }
 
     // MARK: Start
@@ -233,7 +200,7 @@ struct SessionLibraryTests {
     }
 
     /// Completes A, skips its rest, completes B and C, each 10 s after the previous.
-    private func completeAll(_ f: Fixture, _ session: WorkoutSession, _ ids: [UUID], start: Date) throws {
+    private func completeAll(_ f: SessionFixture, _ session: WorkoutSession, _ ids: [UUID], start: Date) throws {
         try f.lib.completeSet(in: session, setID: ids[0], reps: 10, kg: 60, now: start + 10)
         try f.lib.skipRest(in: session, now: start + 11)
         try f.lib.completeSet(in: session, setID: ids[1], reps: 8, kg: 62.5, now: start + 20)
@@ -260,7 +227,7 @@ struct SessionLibraryTests {
         let before = f.lib.snapshot(of: session)
         try f.lib.completeSet(in: session, setID: ids[1], reps: 8, kg: 62.5, now: t0 + 10)
         try f.lib.skipSet(in: session, setID: ids[1], now: t0 + 10)
-        #expect(f.lib.snapshot(of: session) == before)
+        #expect(f.lib.snapshot(of: session).ignoringLastAction() == before.ignoringLastAction())
     }
 
     // MARK: Skip set
@@ -359,7 +326,7 @@ struct SessionLibraryTests {
         let before = f.lib.snapshot(of: session)
         try f.lib.undo(in: session, setID: ids[1], now: t0 + 5)
         try f.lib.undo(in: session, setID: UUID(), now: t0 + 5)
-        #expect(f.lib.snapshot(of: session) == before)
+        #expect(f.lib.snapshot(of: session).ignoringLastAction() == before.ignoringLastAction())
     }
 
     @Test func undoOnTheSetScreenDoesNothing() throws {
@@ -367,7 +334,7 @@ struct SessionLibraryTests {
         let (session, ids) = try started(f)
         let before = f.lib.snapshot(of: session)
         try f.lib.undo(in: session, setID: ids[0], now: t0 + 5)
-        #expect(f.lib.snapshot(of: session) == before)
+        #expect(f.lib.snapshot(of: session).ignoringLastAction() == before.ignoringLastAction())
     }
 
     @Test func undoThenSkipLeavesNoActualValues() throws {
@@ -397,7 +364,7 @@ struct SessionLibraryTests {
         let before = f.lib.snapshot(of: session)
         try f.lib.completeSet(in: session, setID: ids[1], reps: 9, kg: 70, now: t0 + 3)
         try f.lib.skipSet(in: session, setID: ids[1], now: t0 + 3)
-        #expect(f.lib.snapshot(of: session) == before)
+        #expect(f.lib.snapshot(of: session).ignoringLastAction() == before.ignoringLastAction())
         #expect(before.entries[2].status == .pending)
     }
 
@@ -411,7 +378,7 @@ struct SessionLibraryTests {
         try f.lib.skipSet(in: session, setID: ids[0], now: t0 + 100)
         var expected = before
         expected.restEndsAt = nil  // Only the expired rest is cleared.
-        #expect(f.lib.snapshot(of: session) == expected)
+        #expect(f.lib.snapshot(of: session).ignoringLastAction() == expected.ignoringLastAction())
     }
 
     @Test func skipWithAStaleIDChangesNothing() throws {
@@ -421,7 +388,7 @@ struct SessionLibraryTests {
         let before = f.lib.snapshot(of: session)
         try f.lib.skipSet(in: session, setID: ids[0], now: t0 + 2)
         try f.lib.skipSet(in: session, setID: UUID(), now: t0 + 2)
-        #expect(f.lib.snapshot(of: session) == before)
+        #expect(f.lib.snapshot(of: session).ignoringLastAction() == before.ignoringLastAction())
     }
 
     // MARK: Expired rest
@@ -494,7 +461,7 @@ struct SessionLibraryTests {
         let before = f.lib.snapshot(of: session)
         try f.lib.completeSet(in: session, setID: ids[0], reps: 10, kg: 60, now: t0 + 10)
         try f.lib.skipSet(in: session, setID: ids[0], now: t0 + 10)
-        #expect(f.lib.snapshot(of: session) == before)
+        #expect(f.lib.snapshot(of: session).ignoringLastAction() == before.ignoringLastAction())
 
         // A rest paused part way through can't be skipped or undone from outside either.
         session.pausedAt = nil
@@ -504,7 +471,7 @@ struct SessionLibraryTests {
         let resting = f.lib.snapshot(of: session)
         try f.lib.skipRest(in: session, now: t0 + 40)
         try f.lib.undo(in: session, setID: ids[0], now: t0 + 40)
-        #expect(f.lib.snapshot(of: session) == resting)
+        #expect(f.lib.snapshot(of: session).ignoringLastAction() == resting.ignoringLastAction())
     }
 
     // MARK: Persistence

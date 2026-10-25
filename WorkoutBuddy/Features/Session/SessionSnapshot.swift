@@ -36,6 +36,8 @@ nonisolated struct SessionSnapshot: Equatable, Sendable {
     var pausedDuration: TimeInterval = 0
     var pausedAt: Date?
     var restEndsAt: Date?
+    /// When the user last acted on the session (see `WorkoutSession.lastActionAt`).
+    var lastActionAt: Date?
     var status: SessionStatus = .inProgress
     var exerciseCount: Int
     /// Every set, in session order (exercise by exercise, set by set).
@@ -106,14 +108,14 @@ nonisolated struct SessionSnapshot: Equatable, Sendable {
         return (entry.actualReps ?? entry.planned.reps, entry.actualKg ?? entry.planned.kg)
     }
 
-    /// The last moment the user did something: `pausedAt` if paused, else the latest resolution
-    /// of a done or skipped set, else the start. Used to end an interrupted workout at a sensible time.
+    /// The last moment the user did something: `pausedAt` if paused, else the latest of the last action
+    /// (Done, Skip, Skip Rest, Undo, Pause, Resume, ...), the resolution of a done or skipped set, and the
+    /// start. Used to end an interrupted workout at a sensible time.
     var lastActivity: Date {
         if let pausedAt { return pausedAt }
         let resolved = entries
             .filter { $0.status == .done || $0.status == .skipped }
             .compactMap(\.completedAt)
-            .max()
-        return resolved ?? startedAt
+        return (resolved + [lastActionAt, startedAt].compactMap { $0 }).max() ?? startedAt
     }
 }

@@ -14,6 +14,7 @@ struct SessionSnapshotTests {
         pausedDuration: TimeInterval = 0,
         pausedAt: Date? = nil,
         restEndsAt: Date? = nil,
+        lastActionAt: Date? = nil,
         completedAt: [Date?] = [nil, nil, nil]
     ) -> SessionSnapshot {
         let layout = [(0, 0), (0, 1), (1, 0)]
@@ -25,7 +26,7 @@ struct SessionSnapshotTests {
         }
         return SessionSnapshot(
             startedAt: t0, endedAt: endedAt, pausedDuration: pausedDuration, pausedAt: pausedAt,
-            restEndsAt: restEndsAt, exerciseCount: 2, entries: entries)
+            restEndsAt: restEndsAt, lastActionAt: lastActionAt, exerciseCount: 2, entries: entries)
     }
 
     // MARK: Structure
@@ -270,6 +271,33 @@ struct SessionSnapshotTests {
     @Test func lastActivityIsThePauseTimeWhilePaused() {
         let snapshot = makeSnapshot(
             statuses: [.done, .pending, .pending], pausedAt: at(900), completedAt: [at(60), nil, nil])
+        #expect(snapshot.lastActivity == at(900))
+    }
+
+    @Test func lastActivityIsTheLastActionWhenLaterThanEveryResolvedSet() {
+        // Done at +60, then paused and resumed at +1800: the resume is the last activity.
+        let snapshot = makeSnapshot(
+            statuses: [.done, .pending, .pending], lastActionAt: at(1800), completedAt: [at(60), nil, nil])
+        #expect(snapshot.lastActivity == at(1800))
+    }
+
+    @Test func lastActivityIsTheResolvedSetWhenLaterThanTheLastAction() {
+        let snapshot = makeSnapshot(
+            statuses: [.done, .skipped, .pending], lastActionAt: at(60), completedAt: [at(30), at(120), nil])
+        #expect(snapshot.lastActivity == at(120))
+    }
+
+    @Test func lastActivityIsTheLastActionWithoutAnyResolvedSet() {
+        #expect(makeSnapshot(lastActionAt: at(45)).lastActivity == at(45))
+    }
+
+    @Test func lastActivityIsNeverBeforeTheStart() {
+        #expect(makeSnapshot(lastActionAt: at(-10)).lastActivity == t0)
+    }
+
+    @Test func lastActivityIsThePauseTimeEvenWhenTheLastActionIsLater() {
+        let snapshot = makeSnapshot(
+            statuses: [.done, .pending, .pending], pausedAt: at(900), lastActionAt: at(950), completedAt: [at(60), nil, nil])
         #expect(snapshot.lastActivity == at(900))
     }
 }

@@ -57,6 +57,7 @@ struct SessionLibrary {
             pausedDuration: session.pausedDuration,
             pausedAt: session.pausedAt,
             restEndsAt: session.restEndsAt,
+            lastActionAt: session.lastActionAt,
             status: session.status,
             exerciseCount: exercises.count,
             entries: entries)
@@ -75,7 +76,7 @@ struct SessionLibrary {
         }
 
         do {
-            let session = WorkoutSession(workout: nil, startedAt: now)
+            let session = WorkoutSession(workout: nil, startedAt: now, lastActionAt: now)
             context.insert(session)
             session.workout = workout
 
@@ -164,18 +165,95 @@ struct SessionLibrary {
         try perform(session, now: now) { _ in }
     }
 
+    // MARK: Pause, end, discard, save
+
+    /// Pause: freezes the elapsed time and any running rest until Resume. Does nothing when already paused.
+    func pause(in session: WorkoutSession, now: Date = .now) throws {
+        try perform(session, now: now) { snapshot in
+            guard !snapshot.isPaused else { return }
+            session.pausedAt = now
+        }
+    }
+
+    /// Resume: adds the pause to `pausedDuration` and moves a still-running rest later by the same amount.
+    /// Does nothing when not paused. A rest that expired before the pause was already cleared, so it can't come back.
+    func resume(in session: WorkoutSession, now: Date = .now) throws {
+        try perform(session, now: now) { snapshot in
+            guard snapshot.isPaused, let pausedAt = session.pausedAt else { return }
+            let pause = max(0, now.timeIntervalSince(pausedAt))
+            session.pausedDuration += pause
+            if let restEndsAt = session.restEndsAt {
+                session.restEndsAt = restEndsAt.addingTimeInterval(pause)
+            }
+            session.pausedAt = nil
+        }
+    }
+
+    /// End Workout: marks the pending sets not performed (clearing actual values an Undo may have left)
+    /// and finishes the workout, which then shows the summary. Does nothing when no set is done:
+    /// such a workout can only be discarded.
+    func endEarly(in session: WorkoutSession, now: Date = .now) throws {
+        try perform(session, now: now) { snapshot in
+            guard snapshot.hasDoneSet else { return }
+            markPendingNotPerformed(session)
+            finish(session, now: now)
+        }
+    }
+
+    /// Deletes a session that is still in progress (running, or finished and waiting for Save); the
+    /// cascade removes its exercises and sets. Does nothing on a saved session: deleting one from
+    /// History is a separate operation (phase 5, with the personal-record recalculation in phase 6).
+    func discard(_ session: WorkoutSession) throws {
+        guard session.status == .inProgress else { return }
+        try commit { context.delete(session) }
+    }
+
+    /// Save: finalizes a finished session that has a done set. Does nothing without a done set, on a
+    /// session that is still running, or on one that is already saved.
+    ///
+    /// Bad data only: a session whose sets are all resolved but that has no `endedAt` is ended at its
+    /// last activity first, so the user is never stuck on a summary whose Save does nothing.
+    func save(_ session: WorkoutSession) throws {
+        guard session.status == .inProgress else { return }
+        let before = snapshot(of: session)
+        guard before.hasDoneSet else { return }
+        if before.endedAt == nil, before.currentSetIndex != nil { return }
+        try commit {
+            if before.endedAt == nil { finish(session, now: before.lastActivity) }
+            finalize(session)
+        }
+    }
+
+    /// End & Save, for recovery after a kill: ends the workout early at its last recorded activity (not
+    /// the launch time) and saves it to history, in one save. Does nothing without a done set.
+    func endAndSave(_ session: WorkoutSession) throws {
+        guard session.status == .inProgress else { return }
+        let before = snapshot(of: session)
+        guard before.hasDoneSet else { return }
+        try commit {
+            if before.endedAt == nil {
+                markPendingNotPerformed(session)
+                finish(session, now: before.lastActivity)
+            }
+            finalize(session)
+        }
+    }
+
     // MARK: Helpers
 
-    /// Runs one action: does nothing on a finished session; otherwise clears an expired rest, runs `body`
-    /// with a snapshot taken after that, and saves once. A failed save is rolled back and rethrown.
+    /// Runs one action: does nothing on a finished session; otherwise stamps `lastActionAt`, clears an
+    /// expired rest, runs `body` with a snapshot taken after that, and saves once. A failed save is
+    /// rolled back and rethrown.
     private func perform(_ session: WorkoutSession, now: Date, _ body: (SessionSnapshot) -> Void) throws {
         guard session.endedAt == nil else { return }
-        let before = snapshot(of: session)
-        if let restEndsAt = before.restEndsAt, restEndsAt <= before.effectiveTime(now: now) {
-            session.restEndsAt = nil
+        try commit {
+            session.lastActionAt = now
+            let before = snapshot(of: session)
+            if let restEndsAt = before.restEndsAt, restEndsAt <= before.effectiveTime(now: now) {
+                session.restEndsAt = nil
+            }
+            body(snapshot(of: session))
         }
-        body(snapshot(of: session))
-        do { try context.save() } catch { context.rollback(); throw error }
     }
 
     /// The model of the current (first pending) set, if the set actions apply right now and `setID` is
@@ -187,6 +265,29 @@ struct SessionLibrary {
             let index = snapshot.currentSetIndex, snapshot.entries[index].id == setID
         else { return nil }
         return modelSet(id: setID, in: session)
+    }
+
+    /// Sets the final status: ended early if any set was left not performed, else completed.
+    /// Phase 6 adds personal-record detection here, so Save and End & Save both get it.
+    private func finalize(_ session: WorkoutSession) {
+        let snapshot = snapshot(of: session)
+        let stats = SessionStats(snapshot, now: snapshot.endedAt ?? .now)
+        session.status = stats.endedEarly ? .endedEarly : .completed
+    }
+
+    private func markPendingNotPerformed(_ session: WorkoutSession) {
+        for set in session.orderedExercises.flatMap(\.orderedSets) where set.status == .pending {
+            set.status = .notPerformed
+            set.actualReps = nil
+            set.actualKg = nil
+            set.completedAt = nil
+        }
+    }
+
+    /// Runs `body` and saves once; a failed save is rolled back and rethrown.
+    private func commit(_ body: () -> Void) throws {
+        body()
+        do { try context.save() } catch { context.rollback(); throw error }
     }
 
     private func modelSet(id: UUID, in session: WorkoutSession) -> SessionSet? {
