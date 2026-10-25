@@ -292,3 +292,14 @@ The user was asleep, so the main session settled these. Each can be revisited.
 1. [Blocker] The Discard variant of the recovery alert got an automatic Cancel button that left the workout stranded behind a cover that never showed → **accepted**: Resume has the cancel role and the alert is driven by the recovery state, so any dismissal means Resume.
 2. [Major] A second Start tap while the cover was presenting raised an alert under it that knocked the cover away → **accepted**: `.alreadyActive` is ignored in the detail screen (the cover already shows the workout).
 3. [Minor] A failed End & Save or Discard during recovery showed the error at the same moment the cover presented → **accepted**: the recovery question stays and comes back after the error alert.
+
+## Status (2026-10-25, end of the overnight run)
+- Steps 1–8 are implemented, reviewed and committed on `phase-3-session`. Nothing is pushed and no PR is open.
+- Final runs: the full suite passes on iPhone 17 / iOS 27.0 and on iPhone 16 / iOS 18.2 (430 tests each, counted from the `.xcresult`); the Release build succeeds and contains `RestEnd.caf`.
+- Checked at runtime by reviewers (scripted, not by hand): the whole step 7 flow and the step 8 launch/recovery flow on iOS 27 and 18.2 (see the step 7 and step 8 review notes).
+- **Still to do by the user:** the manual check under "Verification" (real taps, feel of the haptic, sound of the chime, VoiceOver, AX text sizes, iOS 18.2 contrast).
+- **Decisions waiting for the user** (each one is easy to change):
+  - Architect finding 4: a workout with no done set is never saved (Discard instead of Save). `FEATURES.md` F3/F5 should say so if agreed.
+  - Architect finding 5: no Undo on the summary for an accidental Done on the last set.
+  - Step 7 finding 7: an unsaveable summary is titled "Workout Ended".
+  - Recovery's "End & Save" saves straight to history without showing the summary.
