@@ -50,7 +50,7 @@ A personal iPhone app for planning gym workouts, running them set by set with gu
   - If the rest period is 0, or it was the last set of the workout, there is no rest screen.
 - **Skip set:** the set is saved as *skipped* and the next set opens right away (no rest).
 - **Pause:** freezes the overall timer and any rest countdown. A paused overlay offers **Resume** and **End workout**.
-- **End early:** asks for confirmation, then shows the summary (F5); when it's saved, the remaining sets are saved as *not performed*. If no set was completed, the app offers to **discard** the session instead.
+- **End early:** asks for confirmation, then shows the summary (F5); when it's saved, the remaining sets are saved as *not performed*. If no set was completed, the app offers to **discard** the session instead (see F5: a workout with no completed set is never saved).
 - **Earlier sets:** on the set screen or the summary, swipe right (or tap Previous Set / Review Sets) to look back at finished sets. A done set's reps and kg can be corrected, a skipped set can be marked as done and a done set as skipped; the workout's position and timers don't change.
 - **Robustness:** timers are calculated from stored timestamps, not by counting ticks, so they stay correct in the background. Session progress is saved after every action. If the app is killed, the next launch offers **Resume** or **End** (which shows the summary, where **Save** stores it).
 
@@ -65,6 +65,7 @@ A personal iPhone app for planning gym workouts, running them set by set with gu
 ### F5 — Workout summary
 - Shown when the last set finishes or the workout ends early: total duration (excluding pauses), sets completed / skipped, total volume (Σ reps × kg) and **new personal records** hit in this session.
 - **Save** stores it to history. A session that ends early is marked as such, and its remaining sets are saved as *not performed*.
+- **A workout with no completed set is never saved.** This covers ending early with nothing done and finishing with every set skipped: the summary offers **Discard Workout** instead of Save, and the title reads "Workout Ended". After a kill, such a workout is offered **Resume** or **Discard**.
 - **Back to Workout** returns to the workout from the summary. The time spent on the summary doesn't count towards the duration.
 
 ### F6 — History calendar

@@ -335,7 +335,7 @@ The user was asleep, so the main session settled these. Each can be revisited.
 - Checked at runtime by reviewers (scripted, not by hand): the whole step 7 flow and the step 8 launch/recovery flow on iOS 27 and 18.2 (see the step 7 and step 8 review notes).
 - **Manual check:** done by the user on 2026-10-25 except the real-device items; see "Manual check results" at the end.
 - **Decisions waiting for the user** (each one is easy to change):
-  - Architect finding 4: a workout with no done set is never saved (Discard instead of Save). `FEATURES.md` F3/F5 should say so if agreed.
+  - ~~Architect finding 4: a workout with no done set is never saved (Discard instead of Save). `FEATURES.md` F3/F5 should say so if agreed.~~ Confirmed by the user; `FEATURES.md` F3 and F5 now say it.
   - ~~Architect finding 5: no Undo on the summary for an accidental Done on the last set.~~ Added in step 9 (Back to Workout).
   - Step 7 finding 7: an unsaveable summary is titled "Workout Ended".
   - ~~Recovery's "End & Save" saves straight to history without showing the summary.~~ Changed by the user in the manual check: step 9.
