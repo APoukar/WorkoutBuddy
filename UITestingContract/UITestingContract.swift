@@ -76,6 +76,8 @@ nonisolated enum UITestingContract {
         static let plannedVolume = "1,420 kilograms"
         /// The summary count line, "3 sets completed" or "1 set completed".
         static func setsCompleted(_ count: Int) -> String { "\(count) \(count == 1 ? "set" : "sets") completed" }
+        /// The summary count line for sets never done or skipped, "2 sets not performed".
+        static func setsNotPerformed(_ count: Int) -> String { "\(count) \(count == 1 ? "set" : "sets") not performed" }
         static let upNextLabel = "Up next"
         /// The "Up next" value on the rest screen after the first "Long Rests" set: the plan of Bench Press set 2.
         static let longRestsUpNextSet2 = "Bench Press, set 2, 8 reps at 62.5 kilograms"
@@ -83,8 +85,18 @@ nonisolated enum UITestingContract {
         static let weightLabel = "Weight"
         static let workoutComplete = "Workout Complete"
         static let workoutEnded = "Workout Ended"
+        static let backToWorkout = "Back to Workout"
+        /// The summary note when no set was done (the workout can't be saved).
+        static let cannotSaveNote = "No sets were completed, so this workout can't be saved."
+        /// The confirmation titles for ending a workout with done sets, and for discarding one with none.
+        static let endConfirmationTitle = "End Workout?"
+        static let discardConfirmationTitle = "Discard Workout?"
         /// The Workouts list row's value contains this once the workout has been done.
         static let lastDone = "Last done"
+        /// The Workouts list row's value for a workout that was never done.
+        static let notDoneYet = "Not done yet"
+        /// The summary volume of the `templates` workouts when the last set's kg is raised by one step (40 to 42.5).
+        static let plannedVolumeWithLastSetRaised = "1,440 kilograms"
     }
 
     /// The `UserDefaults` suite the app reads its settings from in UI-testing mode.

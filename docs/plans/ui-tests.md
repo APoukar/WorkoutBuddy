@@ -198,3 +198,12 @@ As in `CLAUDE.md`, with the findings discussed with the user before anything cha
 2. Repeated summary-volume lookup and pause/resume code → shared helpers in `Support/Screens.swift`; the identifier aliases removed.
 3. The Up next check was a prefix match → the exact spoken value, kept in the contract file.
 4. The keyboard-introduction check waited and collected debug information on every run → checked without a failing wait, after a (succeeding) wait for the keyboard: without that wait one iOS 18.2 run typed "57" instead of "57.5" (a lost keystroke while the keyboard settled); watch for it in later runs. The adjusted-values test takes about 75–95 s on iOS 27 here; step 8 uses this for the CI timing.
+
+**Step 5 code review (2026-10-26, night), verdict "Approve with fixes", 7 minor findings. The user was asleep and had asked the main session to carry on with steps 5–8, so the main session settled them; all accepted** (plus the implementer's merge, accepted: "Back to Workout after an early end" is part of the early-end test, which ends, goes back, ends again and saves):
+1. Back to Workout after the last set didn't prove the set came back with its entered values → the kg is changed before the last Done and checked after Back to Workout; the final volume (1,440 kg) proves nothing was counted twice.
+2. "Nothing saved" was checked as a missing substring → the row's value is checked to contain "Not done yet".
+3. "The cover closed" was checked differently in each test → one `assertNoSessionLayer()` helper, used after every Save and Discard.
+4. Copied Pause → End Workout and "back to the list, read the row" sequences → shared helpers.
+5. The nothing-done discard excluded an identifier that isn't on screen → it excludes the real source button (`pausedEndWorkout`).
+6. The last-set loop didn't check where each Skip Rest landed → `assertSetScreen` before each Done.
+7. The all-skipped discard didn't check the confirmation title → it waits for "Discard Workout?" first.

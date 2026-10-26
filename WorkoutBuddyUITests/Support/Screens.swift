@@ -33,6 +33,34 @@ extension XCUIApplication {
         XCTAssertTrue(pausedLayer.waitForNonExistence(), "the paused overlay didn't close", file: file, line: line)
     }
 
+    /// Pause from the set or rest screen and tap End Workout (which opens the confirmation).
+    func pauseAndTapEndWorkout(from screen: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+        screen.buttons["Pause"].tap()
+        XCTAssertTrue(pausedLayer.waitForExistence(timeout: defaultTimeout), "no paused overlay", file: file, line: line)
+        pausedLayer.buttons[UITestingContract.Identifier.pausedEndWorkout].tap()
+    }
+
+    /// Waits until none of the session layers exists: the session cover has closed.
+    func assertNoSessionLayer(file: StaticString = #filePath, line: UInt = #line) {
+        for layer in [setScreen, restScreen, reviewLayer, pausedLayer, summaryLayer] {
+            XCTAssertTrue(
+                layer.waitForNonExistence(), "a session layer is still showing: \(layer)", file: file, line: line)
+        }
+    }
+
+    /// After the session cover closes the workout's detail is still pushed: go back to the list and check the
+    /// workout's row value contains `text`.
+    func assertRowAfterSession(
+        _ workout: String, valueContains text: String, file: StaticString = #filePath, line: UInt = #line
+    ) {
+        goBack(from: workout)
+        let row = buttons[workout]
+        XCTAssertTrue(row.waitForExistence(timeout: defaultTimeout), "no row for \(workout)", file: file, line: line)
+        XCTAssertTrue(
+            row.waitUntil("value CONTAINS '\(text)'"), "row value: \(String(describing: row.value))",
+            file: file, line: line)
+    }
+
     /// Taps Start Workout on the open template and waits for the first set screen.
     func startWorkout(named name: String) {
         buttons[name].tap()

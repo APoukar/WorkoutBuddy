@@ -43,14 +43,9 @@ nonisolated final class SessionFlowUITests: XCTestCase {
         XCTAssertEqual(volume.value as? String, UITestingContract.Spoken.plannedVolume)
 
         app.summaryLayer.buttons["Save"].tap()
-        XCTAssertTrue(app.summaryLayer.waitForNonExistence(), "the session cover didn't close")
+        app.assertNoSessionLayer()
         // The workout's detail screen is still pushed under the cover; the list row is behind it.
-        app.goBack(from: UITestingContract.Workout.shortRests)
-        let row = app.buttons[UITestingContract.Workout.shortRests]
-        XCTAssertTrue(row.waitForExistence(timeout: defaultTimeout))
-        XCTAssertTrue(
-            row.waitUntil("value CONTAINS '\(UITestingContract.Spoken.lastDone)'"),
-            "row value: \(String(describing: row.value))")
+        app.assertRowAfterSession(UITestingContract.Workout.shortRests, valueContains: UITestingContract.Spoken.lastDone)
     }
 
     /// The rest screen's progress ring is a `TimelineView(.animation)`, which could keep the app from ever
