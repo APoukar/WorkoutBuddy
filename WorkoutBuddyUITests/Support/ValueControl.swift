@@ -33,17 +33,22 @@ struct ValueControl {
     }
 
     /// Scrolls until the whole control is clear of the bottom bar (its top is near the top of the scroll
-    /// view, or it is fully inside the upper 60 %), scrolling back if it went above the top. The drag starts
-    /// in the left margin, where there's no control to catch it.
+    /// view, or it is fully inside the upper 60 %). Each drag covers the distance still needed (a drag moves
+    /// the content by about 90 % of its length), so the control doesn't overshoot past the top and bounce
+    /// back and forth. The drag starts in the left margin, where there's no control to catch it.
     private func reveal() {
         XCTAssertTrue(control.waitForExistence(timeout: defaultTimeout))
         for _ in 0..<6 {
             if isClearOfBar { return }
             let frame = scrollView.frame
-            let offset = control.frame.minY - frame.minY
-            let down = offset < 0
-            let from = scrollView.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: down ? 0.2 : 0.55))
-            let to = scrollView.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: down ? 0.55 : 0.2))
+            // Positive: the content has to move up (the finger drags up) until the control is 8 pt from the top.
+            let needed = (control.frame.minY - frame.minY - 8) / 0.9 / frame.height
+            // The drag stays above the bottom bar (the lowest 35 % of the scroll view), which doesn't scroll.
+            let limit = 0.5
+            let distance = max(-limit, min(limit, needed))
+            let start = distance > 0 ? 0.1 + distance : 0.1
+            let from = scrollView.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: start))
+            let to = scrollView.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: start - distance))
             from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0)
         }
         XCTAssertTrue(isClearOfBar, "the control is still under the bottom bar after scrolling: \(control.frame)")

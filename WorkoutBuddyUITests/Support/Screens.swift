@@ -61,6 +61,14 @@ extension XCUIApplication {
             file: file, line: line)
     }
 
+    /// Answers the launch recovery alert (the `inProgress` and `nothingDone` scenarios raise it) with Resume.
+    func resumeRecoveredWorkout(file: StaticString = #filePath, line: UInt = #line) {
+        let resume = alerts.buttons[UITestingContract.Spoken.resume]
+        XCTAssertTrue(resume.waitForExistence(timeout: defaultTimeout), "no recovery alert", file: file, line: line)
+        resume.tap()
+        XCTAssertTrue(resume.waitForNonExistence(), "the recovery alert didn't close", file: file, line: line)
+    }
+
     /// Taps Start Workout on the open template and waits for the first set screen.
     func startWorkout(named name: String) {
         buttons[name].tap()

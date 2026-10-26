@@ -78,6 +78,8 @@ nonisolated enum UITestingContract {
         static func setsCompleted(_ count: Int) -> String { "\(count) \(count == 1 ? "set" : "sets") completed" }
         /// The summary count line for sets never done or skipped, "2 sets not performed".
         static func setsNotPerformed(_ count: Int) -> String { "\(count) \(count == 1 ? "set" : "sets") not performed" }
+        /// The summary count line for skipped sets, "2 sets skipped".
+        static func setsSkipped(_ count: Int) -> String { "\(count) \(count == 1 ? "set" : "sets") skipped" }
         static let upNextLabel = "Up next"
         /// The "Up next" value on the rest screen after the first "Long Rests" set: the plan of Bench Press set 2.
         static let longRestsUpNextSet2 = "Bench Press, set 2, 8 reps at 62.5 kilograms"
@@ -97,6 +99,29 @@ nonisolated enum UITestingContract {
         static let notDoneYet = "Not done yet"
         /// The summary volume of the `templates` workouts when the last set's kg is raised by one step (40 to 42.5).
         static let plannedVolumeWithLastSetRaised = "1,440 kilograms"
+        /// The recovery alert's Resume button.
+        static let resume = "Resume"
+        /// The review's status badge.
+        static let statusDone = "Done"
+        static let statusSkipped = "Skipped"
+        /// Looking back at earlier sets: the buttons' labels. "Next Set" becomes the back button's label at the
+        /// newest set, so there are then two buttons with the back label.
+        static let previousSet = "Previous Set"
+        static let nextSet = "Next Set"
+        static let reviewSets = "Review Sets"
+        static let backToCurrentSet = "Back to Current Set"
+        static let backToSummary = "Back to Summary"
+        static let markAsDone = "Mark as Done"
+        static let markAsSkipped = "Mark as Skipped"
+        /// The `inProgress` workout's sets: Bench Press 10 x 60 (done), Bench Press 8 x 62.5 (skipped), Overhead Press 8 x 40 (current).
+        static let benchSet1Position = position(exercise: 1, of: 2, set: 1, of: 2)
+        static let benchSet2Position = position(exercise: 1, of: 2, set: 2, of: 2)
+        static let overheadPosition = position(exercise: 2, of: 2, set: 1, of: 1)
+        /// The summary volume after the `inProgress` workout is finished with set 1 raised to 62.5 kg and set 2
+        /// marked as done as planned: 10 x 62.5 + 8 x 62.5 + 8 x 40.
+        static let volumeAfterCorrectionAndMarkDone = "1,445 kilograms"
+        /// The summary volume when only the Overhead Press set (8 x 40) is done.
+        static let volumeOfOverheadOnly = "320 kilograms"
     }
 
     /// The `UserDefaults` suite the app reads its settings from in UI-testing mode.
