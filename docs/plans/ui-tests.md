@@ -136,6 +136,11 @@ As in `CLAUDE.md`, with the findings discussed with the user before anything cha
   - `onSummary` → the summary opens without an alert.
   - Real kill (disk store): `templates` → "Long Rests" → Start → Done → rest screen → `terminate()` → relaunch with keep data → the alert → Resume → the rest screen still counting down; the same with End Workout → the summary with "1 set completed".
 
+**Step 7b — Hardening against lost taps and keystrokes** (added after the step 7 review, 2026-10-26 night, by the main session)
+- Use `waitUntilSettled()` before every first tap after a presentation: `startWorkout`'s first action, alert and confirmation buttons (in `Dialogs.swift` and `resumeRecoveredWorkout`), and the first tap on a newly shown layer where the tests tap straight away.
+- Typing: type one character at a time and wait for the field's value to show it before the next one, so a keystroke lost while the keyboard settles can't go unnoticed (no retyping, no retries).
+- Check: `-test-iterations 5 -run-tests-until-failure` for the whole UI target on iOS 18.2 and 3 on iOS 27, all green.
+
 **Step 8 — CI and documentation**
 - `.github/workflows/ci.yml`:
   - The Build step gets `id: build`; `build-for-testing` builds both test bundles as now.
@@ -215,3 +220,10 @@ As in `CLAUDE.md`, with the findings discussed with the user before anything cha
 3. At the newest set the review has two buttons labelled "Back to Current Set" ("Back to Summary") → **no change**; logged for the UI tidying session (VoiceOver reads it twice; Voice Control needs a number).
 4. The index taps on those two buttons are robust but the comments overstated it → **accepted**: comments reworded.
 5. "No Pause" in the review from the summary was only checked one way → **accepted**: the live review asserts Pause is there.
+
+**Step 7 code review (2026-10-26, night), verdict "Approve with fixes", 5 findings, settled by the main session; all accepted:**
+1. [Major] One iOS 18.2 run of the Resume kill test failed: on the first launch a Done tap right after Start reached the app but did nothing → Done is tapped only once hittable, and the failure was chased with 5-iteration runs on iOS 18.2. It didn't reproduce, but the same kind of lost tap hit the recovery alert's Resume ~1.7 s after the alert appeared: a tap during a presentation animation on the loaded Mac, not an app bug (it also happened with the in-memory store). A new `waitUntilSettled()` (exists, hittable, same frame twice) now guards the taps right after a presentation in the recovery tests; 5 iterations on 18.2 then passed. The remaining rare flakes (the lost ".5" keystroke on 18.2, about 2 in 7 runs; one lost confirmation tap on iOS 27) are handled in a hardening step before CI (step 7b).
+2. [Major] The countdown check would pass if Resume restarted the rest → it checks the remaining time against the time since Done and waits for the countdown to change.
+3. "No session layer before the alert" had no positive control → it also checks the list behind the alert is in the tree.
+4. Re-seeding on relaunch wasn't detected and Save after a kill wasn't checked → the End Workout kill test saves and checks there's exactly one "Long Rests" row showing "Last done".
+5. A copied row check → `assertRow(_:valueContains:)` split out of `assertRowAfterSession`; the alert's close is awaited.

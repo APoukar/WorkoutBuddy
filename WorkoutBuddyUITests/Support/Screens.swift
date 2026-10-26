@@ -54,6 +54,13 @@ extension XCUIApplication {
         _ workout: String, valueContains text: String, file: StaticString = #filePath, line: UInt = #line
     ) {
         goBack(from: workout)
+        assertRow(workout, valueContains: text, file: file, line: line)
+    }
+
+    /// Looks up the workout's row in the Workouts list and waits until its value contains `text`.
+    func assertRow(
+        _ workout: String, valueContains text: String, file: StaticString = #filePath, line: UInt = #line
+    ) {
         let row = buttons[workout]
         XCTAssertTrue(row.waitForExistence(timeout: defaultTimeout), "no row for \(workout)", file: file, line: line)
         XCTAssertTrue(
@@ -65,6 +72,7 @@ extension XCUIApplication {
     func resumeRecoveredWorkout(file: StaticString = #filePath, line: UInt = #line) {
         let resume = alerts.buttons[UITestingContract.Spoken.resume]
         XCTAssertTrue(resume.waitForExistence(timeout: defaultTimeout), "no recovery alert", file: file, line: line)
+        XCTAssertTrue(resume.waitUntilSettled(), "the recovery alert never settled", file: file, line: line)
         resume.tap()
         XCTAssertTrue(resume.waitForNonExistence(), "the recovery alert didn't close", file: file, line: line)
     }

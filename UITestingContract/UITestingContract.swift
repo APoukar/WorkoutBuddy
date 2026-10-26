@@ -99,8 +99,14 @@ nonisolated enum UITestingContract {
         static let notDoneYet = "Not done yet"
         /// The summary volume of the `templates` workouts when the last set's kg is raised by one step (40 to 42.5).
         static let plannedVolumeWithLastSetRaised = "1,440 kilograms"
-        /// The recovery alert's Resume button.
+        /// The recovery alert: title, the message naming the workout (curly quotes), and its buttons.
+        static let recoveryTitle = "Resume Workout?"
+        static func recoveryMessage(workout: String) -> String { "\u{201C}\(workout)\u{201D} was still in progress." }
         static let resume = "Resume"
+        static let recoveryEndWorkout = "End Workout"
+        static let recoveryDiscard = "Discard"
+        /// The rest screen's countdown element starts its label with this (the value is the remaining time).
+        static let restRemainingLabel = "Rest remaining"
         /// The review's status badge.
         static let statusDone = "Done"
         static let statusSkipped = "Skipped"
