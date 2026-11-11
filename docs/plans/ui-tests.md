@@ -136,10 +136,10 @@ As in `CLAUDE.md`, with the findings discussed with the user before anything cha
   - `onSummary` → the summary opens without an alert.
   - Real kill (disk store): `templates` → "Long Rests" → Start → Done → rest screen → `terminate()` → relaunch with keep data → the alert → Resume → the rest screen still counting down; the same with End Workout → the summary with "1 set completed".
 
-**Step 7b — Hardening against lost taps and keystrokes** (added after the step 7 review, 2026-10-26 night, by the main session)
-- Use `waitUntilSettled()` before every first tap after a presentation: `startWorkout`'s first action, alert and confirmation buttons (in `Dialogs.swift` and `resumeRecoveredWorkout`), and the first tap on a newly shown layer where the tests tap straight away.
-- Typing: type one character at a time and wait for the field's value to show it before the next one, so a keystroke lost while the keyboard settles can't go unnoticed (no retyping, no retries).
-- Check: `-test-iterations 5 -run-tests-until-failure` for the whole UI target on iOS 18.2 and 3 on iOS 27, all green.
+**Step 7b — Hardening against lost taps and keystrokes** (added after the step 7 review, 2026-10-26, by the main session)
+- `tapSettled()` (in `Support/Waiting.swift`) before every first tap after a presentation: `startWorkout`, alert and confirmation buttons, the paused layer's buttons, the summary's buttons, and taps on a newly shown layer. "Settled" = the element exists, its frame is non-empty, overlaps the app window and is the same on two consecutive checks. It deliberately doesn't use `isHittable`: on GitHub CI (iOS 27) a fully visible, still Done button was never reported hittable ("Done never settled", run 40325692361), and locally scroll content and the review opened from the summary weren't either.
+- Typing: `ValueControl.type(_:deleting:)` types one character at a time and waits for the field to show it, so a lost keystroke fails at that character (no retyping, no retries).
+- Verification: the user chose GitHub CI for the full suite (the Mac's load was 75–124 for hours, so local runs gave no usable result); locally only `build-for-testing`.
 
 **Step 8 — CI and documentation**
 - `.github/workflows/ci.yml`:
@@ -227,3 +227,14 @@ As in `CLAUDE.md`, with the findings discussed with the user before anything cha
 3. "No session layer before the alert" had no positive control → it also checks the list behind the alert is in the tree.
 4. Re-seeding on relaunch wasn't detected and Save after a kill wasn't checked → the End Workout kill test saves and checks there's exactly one "Long Rests" row showing "Last done".
 5. A copied row check → `assertRow(_:valueContains:)` split out of `assertRowAfterSession`; the alert's close is awaited.
+
+**Step 7b code review (2026-11-12), verdict "Approve with fixes", 4 major and 5 minor findings, discussed with the user; 1–7 and 9 accepted, 8 in part:**
+1. [Major] The settle was inside the timed window of `testRestScreenRespondsQuickly` → the clock starts after the settle, right before the tap.
+2. [Major] The summary's Review Sets row was still found with `isHittable`, and a row partly under the bottom bar could pass the settle → scrolled until its bottom is above Save, asserted, then `tapSettled()`.
+3. [Major] The review helper still waited 2 s for `isHittable` (always false on iOS 27, a hidden delay) and didn't settle after scrolling → renamed `tapReviewElement`: settles after the scroll, then always taps by coordinate; callers check the result.
+4. [Major] `TemplateEditorUITests` wasn't hardened → `tapSettled()` for the first taps after a sheet, push, pop or dismiss; per-character typing moved into `XCUIElement.typeSlowly(_:)`, used by `ValueControl.type` and for the name and search fields.
+5. `dismissSearch` relied on `isHittable` and could silently do nothing → waits for the button to settle and fails if neither button was tapped.
+6. The settle read the first window's frame → uses the app's frame (screen bounds).
+7. The settle's doc comment → says the expectation polls about once a second, which is what covers fades, and each settle costs about 1 s.
+8. Redundant settles → only the confirmation's Cancel tap after an already settled confirm becomes a plain tap; the settles before Done on a screen already showing stay (about 1 s each, cheap insurance on CI).
+9. The value predicate was built by string interpolation → `NSPredicate(format: "value == %@", …)`.

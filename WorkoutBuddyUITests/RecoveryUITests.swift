@@ -56,13 +56,12 @@ nonisolated final class RecoveryUITests: XCTestCase {
     func testEndWorkoutFromAlertShowsSummaryAndSave() {
         let app = launch(scenario: UITestingContract.Scenario.inProgress)
         let alert = assertRecoveryAlert(app)
-        XCTAssertTrue(alert.buttons[Spoken.recoveryEndWorkout].waitUntilSettled(), "the alert never settled")
-        alert.buttons[Spoken.recoveryEndWorkout].tap()
+        alert.buttons[Spoken.recoveryEndWorkout].tapSettled()
         XCTAssertTrue(alert.waitForNonExistence(), "the alert didn't close")
 
         app.assertSummary(title: Spoken.workoutEnded)
         XCTAssertTrue(app.summaryLayer.staticTexts[Spoken.setsCompleted(1)].exists)
-        app.summaryLayer.buttons["Save"].tap()
+        app.summaryLayer.buttons["Save"].tapSettled()
         app.assertNoSessionLayer()
         // A recovered session has no pushed detail screen under the cover: the list itself is showing.
         app.assertRow(longRests, valueContains: Spoken.lastDone)
@@ -76,8 +75,7 @@ nonisolated final class RecoveryUITests: XCTestCase {
         XCTAssertTrue(alert.buttons[Spoken.recoveryDiscard].exists)
         XCTAssertFalse(alert.buttons[Spoken.recoveryEndWorkout].exists)
 
-        XCTAssertTrue(alert.buttons[Spoken.recoveryDiscard].waitUntilSettled(), "the alert never settled")
-        alert.buttons[Spoken.recoveryDiscard].tap()
+        alert.buttons[Spoken.recoveryDiscard].tapSettled()
         XCTAssertTrue(alert.waitForNonExistence(), "the alert didn't close")
         app.assertNoSessionLayer()
         app.assertRow(longRests, valueContains: Spoken.notDoneYet)
@@ -145,12 +143,11 @@ nonisolated final class RecoveryUITests: XCTestCase {
     func testKillDuringRestThenEndWorkoutShowsOneSetCompleted() {
         let (app, _) = killDuringRestAndRelaunch()
         let alert = app.alerts[Spoken.recoveryTitle]
-        XCTAssertTrue(alert.buttons[Spoken.recoveryEndWorkout].waitUntilSettled(), "the alert never settled")
-        alert.buttons[Spoken.recoveryEndWorkout].tap()
+        alert.buttons[Spoken.recoveryEndWorkout].tapSettled()
         XCTAssertTrue(alert.waitForNonExistence(), "the alert didn't close")
         app.assertSummary(title: Spoken.workoutEnded)
         XCTAssertTrue(app.summaryLayer.staticTexts[Spoken.setsCompleted(1)].exists)
-        app.summaryLayer.buttons["Save"].tap()
+        app.summaryLayer.buttons["Save"].tapSettled()
         app.assertNoSessionLayer()
         app.assertRow(longRests, valueContains: Spoken.lastDone)
         // One row only: the relaunch didn't seed the templates a second time.

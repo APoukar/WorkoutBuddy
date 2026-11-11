@@ -15,9 +15,9 @@ nonisolated final class SessionEndUITests: XCTestCase {
     private func endEarlyWithOneSetDone(_ app: XCUIApplication) {
         app.startWorkout(named: UITestingContract.Workout.longRests)
         app.assertSetScreen(exercise: "Bench Press", position: Spoken.position(exercise: 1, of: 2, set: 1, of: 2))
-        app.setScreen.buttons[ID.setDone].tap()
+        app.setScreen.buttons[ID.setDone].tapSettled()
         app.assertRestScreen()
-        app.restScreen.buttons["Skip Rest"].tap()
+        app.restScreen.buttons["Skip Rest"].tapSettled()
         app.assertSetScreen(exercise: "Bench Press", position: Spoken.position(exercise: 1, of: 2, set: 2, of: 2))
         app.pauseAndTapEndWorkout(from: app.setScreen)
         XCTAssertTrue(
@@ -38,7 +38,7 @@ nonisolated final class SessionEndUITests: XCTestCase {
         XCTAssertTrue(app.summaryLayer.staticTexts[Spoken.setsNotPerformed(2)].exists)
 
         // Back to Workout reopens the second set, not the summary.
-        app.summaryLayer.buttons[Spoken.backToWorkout].tap()
+        app.summaryLayer.buttons[Spoken.backToWorkout].tapSettled()
         XCTAssertTrue(app.summaryLayer.waitForNonExistence(), "the summary stayed after Back to Workout")
         app.assertSetScreen(exercise: "Bench Press", position: Spoken.position(exercise: 1, of: 2, set: 2, of: 2))
 
@@ -49,7 +49,7 @@ nonisolated final class SessionEndUITests: XCTestCase {
         XCTAssertTrue(app.summaryLayer.staticTexts[Spoken.setsCompleted(1)].exists)
         XCTAssertTrue(app.summaryLayer.staticTexts[Spoken.setsNotPerformed(2)].exists)
 
-        app.summaryLayer.buttons["Save"].tap()
+        app.summaryLayer.buttons["Save"].tapSettled()
         app.assertNoSessionLayer()
         // The workout's detail screen is still pushed under the cover; the list row is behind it.
         app.assertRowAfterSession(UITestingContract.Workout.longRests, valueContains: Spoken.lastDone)
@@ -73,22 +73,22 @@ nonisolated final class SessionEndUITests: XCTestCase {
             if index == positions.count - 1 {
                 ValueControl(identifier: ID.kgControl, in: app.setScreen).increment()
             }
-            app.setScreen.buttons[ID.setDone].tap()
+            app.setScreen.buttons[ID.setDone].tapSettled()
             if index < positions.count - 1 {
                 app.assertRestScreen()
-                app.restScreen.buttons["Skip Rest"].tap()
+                app.restScreen.buttons["Skip Rest"].tapSettled()
             }
         }
         app.assertSummary(title: Spoken.workoutComplete)
 
-        app.summaryLayer.buttons[Spoken.backToWorkout].tap()
+        app.summaryLayer.buttons[Spoken.backToWorkout].tapSettled()
         XCTAssertTrue(app.summaryLayer.waitForNonExistence(), "the summary stayed after Back to Workout")
         let last = positions[positions.count - 1]
         app.assertSetScreen(exercise: last.0, position: last.1)
         XCTAssertEqual(ValueControl(identifier: ID.kgControl, in: app.setScreen).value, "42.5 kilograms")
         XCTAssertEqual(ValueControl(identifier: ID.repsControl, in: app.setScreen).value, "8")
 
-        app.setScreen.buttons[ID.setDone].tap()
+        app.setScreen.buttons[ID.setDone].tapSettled()
         app.assertSummary(title: Spoken.workoutComplete)
         XCTAssertTrue(app.summaryLayer.staticTexts[Spoken.setsCompleted(3)].exists)
         XCTAssertEqual(app.summaryVolume.value as? String, Spoken.plannedVolumeWithLastSetRaised)
@@ -126,7 +126,7 @@ nonisolated final class SessionEndUITests: XCTestCase {
         ]
         for (exercise, position) in positions {
             app.assertSetScreen(exercise: exercise, position: position)
-            app.setScreen.buttons["Skip Set"].tap()
+            app.setScreen.buttons["Skip Set"].tapSettled()
         }
 
         app.assertSummary(title: Spoken.workoutEnded)
@@ -134,7 +134,7 @@ nonisolated final class SessionEndUITests: XCTestCase {
         XCTAssertFalse(app.summaryLayer.buttons["Save"].exists, "Save is offered for a workout with no done set")
         let discard = app.summaryLayer.buttons[ID.summaryDiscardWorkout]
         XCTAssertTrue(discard.exists, "no Discard Workout")
-        discard.tap()
+        discard.tapSettled()
         XCTAssertTrue(
             app.staticTexts[Spoken.discardConfirmationTitle].waitForExistence(timeout: defaultTimeout),
             "no Discard Workout? question")

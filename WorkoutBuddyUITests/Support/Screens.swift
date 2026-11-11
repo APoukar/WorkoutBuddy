@@ -23,21 +23,21 @@ extension XCUIApplication {
     /// Pause from the given screen (set or rest), check the paused layer offers Resume and End Workout, then
     /// Resume and wait until the layer is gone.
     func pauseAndResume(from screen: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
-        screen.buttons["Pause"].tap()
+        screen.buttons["Pause"].tapSettled()
         XCTAssertTrue(pausedLayer.waitForExistence(timeout: defaultTimeout), "no paused overlay", file: file, line: line)
         XCTAssertTrue(pausedLayer.buttons["Resume"].exists, "no Resume", file: file, line: line)
         XCTAssertTrue(
             pausedLayer.buttons[UITestingContract.Identifier.pausedEndWorkout].exists, "no End Workout",
             file: file, line: line)
-        pausedLayer.buttons["Resume"].tap()
+        pausedLayer.buttons["Resume"].tapSettled()
         XCTAssertTrue(pausedLayer.waitForNonExistence(), "the paused overlay didn't close", file: file, line: line)
     }
 
     /// Pause from the set or rest screen and tap End Workout (which opens the confirmation).
     func pauseAndTapEndWorkout(from screen: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
-        screen.buttons["Pause"].tap()
+        screen.buttons["Pause"].tapSettled()
         XCTAssertTrue(pausedLayer.waitForExistence(timeout: defaultTimeout), "no paused overlay", file: file, line: line)
-        pausedLayer.buttons[UITestingContract.Identifier.pausedEndWorkout].tap()
+        pausedLayer.buttons[UITestingContract.Identifier.pausedEndWorkout].tapSettled()
     }
 
     /// Waits until none of the session layers exists: the session cover has closed.
@@ -72,17 +72,16 @@ extension XCUIApplication {
     func resumeRecoveredWorkout(file: StaticString = #filePath, line: UInt = #line) {
         let resume = alerts.buttons[UITestingContract.Spoken.resume]
         XCTAssertTrue(resume.waitForExistence(timeout: defaultTimeout), "no recovery alert", file: file, line: line)
-        XCTAssertTrue(resume.waitUntilSettled(), "the recovery alert never settled", file: file, line: line)
-        resume.tap()
+        resume.tapSettled()
         XCTAssertTrue(resume.waitForNonExistence(), "the recovery alert didn't close", file: file, line: line)
     }
 
     /// Taps Start Workout on the open template and waits for the first set screen.
     func startWorkout(named name: String) {
-        buttons[name].tap()
+        buttons[name].tapSettled()
         let start = buttons["Start Workout"]
         XCTAssertTrue(start.waitForExistence(timeout: defaultTimeout), "Start Workout didn't appear")
-        start.tap()
+        start.tapSettled()
     }
 
     /// "On the set screen" means the set layer exists and neither the review nor the paused layer is above it.

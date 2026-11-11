@@ -82,18 +82,15 @@ nonisolated final class ReviewSetsUITests: XCTestCase {
         return tops.min() ?? app.windows.firstMatch.frame.maxY
     }
 
-    /// Taps a button in the review. First it waits (2 s) for XCUITest to call the button hittable, so a tap doesn't
-    /// land while the review is still sliding in. A content button (`inContent`, the footer's Mark as Skipped)
-    /// is scrolled up until it is clear of the bottom bar, and no further; the drag starts in the left margin,
-    /// above the bar (which doesn't scroll), where there's no control to catch it.
+    /// Taps a button in the review, once it has settled. A content button (`inContent`, the footer's Mark as
+    /// Skipped) is scrolled up until it is clear of the bottom bar, and no further; the drag starts in the left
+    /// margin, above the bar (which doesn't scroll).
     ///
-    /// On iOS 27 every button of a review opened from the summary is reported not hittable (hit point
-    /// {-1, -1}, even the - / + buttons and Back), although a real touch reaches it: the coordinate taps below
-    /// worked, so the underlying summary answers XCUITest's accessibility hit test but not touches. In that
-    /// case the button is tapped by coordinate (the upper part of a content button, which is clear of the
-    /// bar); the status or screen change that every caller checks afterwards proves the tap landed.
+    /// Always a coordinate tap: on iOS 27 XCUITest reports the buttons of a review opened from the summary as
+    /// not hittable (hit point {-1, -1}) although real touches reach them. The upper part of a content button
+    /// is tapped, which is clear of the bar. Callers verify the result.
     @MainActor
-    private func tapWhenHittable(
+    private func tapReviewElement(
         _ app: XCUIApplication, _ button: XCUIElement, _ name: String, inContent: Bool = false,
         file: StaticString = #filePath, line: UInt = #line
     ) {
@@ -108,11 +105,8 @@ nonisolated final class ReviewSetsUITests: XCTestCase {
             from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0)
         }
         XCTAssertFalse(needsScrolling(), "\(name) button is still out of reach", file: file, line: line)
-        if !inContent, button.waitUntil("isHittable == true", timeout: 2) {
-            button.tap()
-        } else {
-            button.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: inContent ? 0.25 : 0.5)).tap()
-        }
+        XCTAssertTrue(button.waitUntilSettled(), "\(name) button never settled", file: file, line: line)
+        button.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: inContent ? 0.25 : 0.5)).tap()
     }
 
     /// Taps the review's only button with this label.
@@ -120,7 +114,7 @@ nonisolated final class ReviewSetsUITests: XCTestCase {
     private func tapReviewButton(_ app: XCUIApplication, _ label: String, file: StaticString = #filePath, line: UInt = #line) {
         let query = reviewButtons(app, label)
         XCTAssertEqual(query.count, 1, "expected one \(label) button in the review", file: file, line: line)
-        tapWhenHittable(
+        tapReviewElement(
             app, query.firstMatch, label, inContent: label == Spoken.markAsSkipped, file: file, line: line)
     }
 
@@ -152,11 +146,11 @@ nonisolated final class ReviewSetsUITests: XCTestCase {
         XCTAssertEqual(ValueControl(identifier: ID.repsControl, in: app.setScreen).value, "9")
 
         // Buttons: Previous Set on the set screen, then the bar's Previous and Next.
-        app.setScreen.buttons[Spoken.previousSet].tap()
+        app.setScreen.buttons[Spoken.previousSet].tapSettled()
         assertSkippedSet2Review(app)
         let previous = app.reviewLayer.buttons[Spoken.previousSet]
         XCTAssertTrue(previous.isEnabled)
-        tapWhenHittable(app, previous, Spoken.previousSet)
+        tapReviewElement(app, previous, Spoken.previousSet)
         assertDoneSet1Review(app)
         // Set 1 is the oldest: there's nothing further back.
         XCTAssertFalse(app.reviewLayer.buttons[Spoken.previousSet].isEnabled, "Previous is enabled at the oldest set")
@@ -167,14 +161,14 @@ nonisolated final class ReviewSetsUITests: XCTestCase {
         // (Next acts as Back there). Both are tapped, one per trip; which one is which doesn't matter.
         let backButtons = reviewButtons(app, Spoken.backToCurrentSet)
         XCTAssertEqual(backButtons.count, 2, "expected the Back and Next buttons, both named Back to Current Set")
-        tapWhenHittable(app, backButtons.element(boundBy: 1), "second Back to Current Set")
+        tapReviewElement(app, backButtons.element(boundBy: 1), "second Back to Current Set")
         XCTAssertTrue(app.reviewLayer.waitForNonExistence(), "the review stayed after the second Back button")
         assertCurrentSet(app)
 
-        app.setScreen.buttons[Spoken.previousSet].tap()
+        app.setScreen.buttons[Spoken.previousSet].tapSettled()
         assertSkippedSet2Review(app)
         XCTAssertEqual(backButtons.count, 2)
-        tapWhenHittable(app, backButtons.element(boundBy: 0), "first Back to Current Set")
+        tapReviewElement(app, backButtons.element(boundBy: 0), "first Back to Current Set")
         XCTAssertTrue(app.reviewLayer.waitForNonExistence(), "the review stayed after the first Back button")
         assertCurrentSet(app)
         XCTAssertEqual(ValueControl(identifier: ID.repsControl, in: app.setScreen).value, "9")
@@ -188,7 +182,7 @@ nonisolated final class ReviewSetsUITests: XCTestCase {
     @MainActor
     func testCorrectingDoneSetAndMarkingSkippedSetAsDoneCountInTheSummary() {
         let app = launchInProgress()
-        app.setScreen.buttons[Spoken.previousSet].tap()
+        app.setScreen.buttons[Spoken.previousSet].tapSettled()
         assertSkippedSet2Review(app)
 
         // Mark as Done on the skipped set: it becomes a done set (same values), and the button is replaced.
@@ -210,7 +204,7 @@ nonisolated final class ReviewSetsUITests: XCTestCase {
         XCTAssertTrue(app.reviewLayer.waitForNonExistence(), "the review stayed after Back to Current Set")
         assertCurrentSet(app)
 
-        app.setScreen.buttons[ID.setDone].tap()
+        app.setScreen.buttons[ID.setDone].tapSettled()
         app.assertSummary(title: Spoken.workoutComplete)
         XCTAssertTrue(app.summaryLayer.staticTexts[Spoken.setsCompleted(3)].exists, "not 3 sets completed")
         XCTAssertEqual(app.summaryVolume.value as? String, Spoken.volumeAfterCorrectionAndMarkDone)
@@ -222,7 +216,7 @@ nonisolated final class ReviewSetsUITests: XCTestCase {
     @MainActor
     func testMarkingDoneSetAsSkippedChangesItsStatusAndTheSummary() {
         let app = launchInProgress()
-        app.setScreen.buttons[Spoken.previousSet].tap()
+        app.setScreen.buttons[Spoken.previousSet].tapSettled()
         assertSkippedSet2Review(app)
         tapReviewButton(app, Spoken.previousSet)
         assertDoneSet1Review(app)
@@ -235,7 +229,7 @@ nonisolated final class ReviewSetsUITests: XCTestCase {
         tapReviewButton(app, Spoken.backToCurrentSet)
         XCTAssertTrue(app.reviewLayer.waitForNonExistence(), "the review stayed after Back to Current Set")
         assertCurrentSet(app)
-        app.setScreen.buttons[ID.setDone].tap()
+        app.setScreen.buttons[ID.setDone].tapSettled()
         app.assertSummary(title: Spoken.workoutComplete)
         XCTAssertTrue(app.summaryLayer.staticTexts[Spoken.setsCompleted(1)].exists, "not 1 set completed")
         XCTAssertTrue(app.summaryLayer.staticTexts[Spoken.setsSkipped(2)].exists, "not 2 sets skipped")
@@ -254,9 +248,13 @@ nonisolated final class ReviewSetsUITests: XCTestCase {
         XCTAssertTrue(app.summaryLayer.buttons["Save"].exists)
         // Review Sets is a list row below the counts and may be off screen (the list builds rows lazily).
         let reviewSets = app.summaryLayer.buttons[Spoken.reviewSets]
-        for _ in 0..<4 where !(reviewSets.exists && reviewSets.isHittable) { app.summaryLayer.swipeUp() }
-        XCTAssertTrue(reviewSets.isHittable, "Review Sets not reachable")
-        reviewSets.tap()
+        let saveButton = app.summaryLayer.buttons["Save"]
+        func reviewSetsIsClearOfBar() -> Bool {
+            reviewSets.exists && reviewSets.frame.maxY <= saveButton.frame.minY
+        }
+        for _ in 0..<4 where !reviewSetsIsClearOfBar() { app.summaryLayer.swipeUp() }
+        XCTAssertTrue(reviewSetsIsClearOfBar(), "Review Sets is missing or still under the Save bar after scrolling")
+        reviewSets.tapSettled()
 
         // The newest set, from the summary: Done, no Pause, and the way back is Back to Summary.
         assertReview(

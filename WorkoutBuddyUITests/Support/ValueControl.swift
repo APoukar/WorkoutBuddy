@@ -27,6 +27,14 @@ struct ValueControl {
         field.tap()
     }
 
+    /// Clears the focused field with `deleteCount` delete keys, then types `text` one character at a time,
+    /// waiting after each for the field's value to show everything typed so far. A keystroke lost while the
+    /// keyboard settles then fails here, at the character, instead of surfacing as a wrong value later.
+    func type(_ text: String, deleting deleteCount: Int, file: StaticString = #filePath, line: UInt = #line) {
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: deleteCount))
+        field.typeSlowly(text, file: file, line: line)
+    }
+
     private func tapButton(_ label: String) {
         reveal()
         control.buttons[label].tap()

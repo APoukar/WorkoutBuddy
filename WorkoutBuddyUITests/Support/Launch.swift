@@ -38,11 +38,12 @@ extension XCUIApplication {
     func dismissSearch() {
         for name in ["close", "Cancel"] {
             let button = buttons[name]
-            if button.exists, button.isHittable {
+            if button.exists, button.waitUntilSettled(timeout: 3) {
                 button.tap()
                 return
             }
         }
+        XCTFail("no close or Cancel button to end the search (is a search active?)")
     }
 }
 

@@ -17,7 +17,7 @@ nonisolated final class SessionFlowUITests: XCTestCase {
         app.assertSetScreen(
             exercise: "Bench Press",
             position: UITestingContract.Spoken.position(exercise: 1, of: 2, set: 1, of: 2))
-        app.setScreen.buttons[UITestingContract.Identifier.setDone].tap()
+        app.setScreen.buttons[UITestingContract.Identifier.setDone].tapSettled()
 
         // 10 s rest: the second Bench Press set opens by itself.
         app.assertRestScreen()
@@ -28,13 +28,13 @@ nonisolated final class SessionFlowUITests: XCTestCase {
         XCTAssertFalse(app.restScreen.exists)
 
         // 0 s rest: the next exercise opens straight away, without a rest screen.
-        app.setScreen.buttons[UITestingContract.Identifier.setDone].tap()
+        app.setScreen.buttons[UITestingContract.Identifier.setDone].tapSettled()
         app.assertSetScreen(
             exercise: "Overhead Press",
             position: UITestingContract.Spoken.position(exercise: 2, of: 2, set: 1, of: 1))
 
         // The last set goes straight to the summary.
-        app.setScreen.buttons[UITestingContract.Identifier.setDone].tap()
+        app.setScreen.buttons[UITestingContract.Identifier.setDone].tapSettled()
         app.assertSummary(title: UITestingContract.Spoken.workoutComplete)
         XCTAssertTrue(app.summaryLayer.staticTexts[UITestingContract.Spoken.setsCompleted(3)].exists)
         // Also proves the English region applied: "1,420", not "1 420".
@@ -42,7 +42,7 @@ nonisolated final class SessionFlowUITests: XCTestCase {
         XCTAssertTrue(volume.exists)
         XCTAssertEqual(volume.value as? String, UITestingContract.Spoken.plannedVolume)
 
-        app.summaryLayer.buttons["Save"].tap()
+        app.summaryLayer.buttons["Save"].tapSettled()
         app.assertNoSessionLayer()
         // The workout's detail screen is still pushed under the cover; the list row is behind it.
         app.assertRowAfterSession(UITestingContract.Workout.shortRests, valueContains: UITestingContract.Spoken.lastDone)
@@ -57,10 +57,11 @@ nonisolated final class SessionFlowUITests: XCTestCase {
         let app = launch(scenario: UITestingContract.Scenario.templates)
         app.startWorkout(named: UITestingContract.Workout.longRests)
         XCTAssertTrue(app.setScreen.waitForExistence(timeout: defaultTimeout))
-        app.setScreen.buttons[UITestingContract.Identifier.setDone].tap()
+        app.setScreen.buttons[UITestingContract.Identifier.setDone].tapSettled()
 
         app.assertRestScreen()
         let skip = app.restScreen.buttons["Skip Rest"]
+        XCTAssertTrue(skip.waitUntilSettled(), "Skip Rest never settled")
         let start = Date()
         skip.tap()
         let tapDuration = Date().timeIntervalSince(start)
@@ -74,13 +75,13 @@ nonisolated final class SessionFlowUITests: XCTestCase {
     func testCancelConfirmationKeepsWorkoutPaused() {
         let app = launch(scenario: UITestingContract.Scenario.templates)
         app.startWorkout(named: UITestingContract.Workout.longRests)
-        app.setScreen.buttons[UITestingContract.Identifier.setDone].tap()
+        app.setScreen.buttons[UITestingContract.Identifier.setDone].tapSettled()
         app.assertRestScreen()
-        app.restScreen.buttons["Skip Rest"].tap()
+        app.restScreen.buttons["Skip Rest"].tapSettled()
         XCTAssertTrue(app.setScreen.waitForExistence(timeout: defaultTimeout))
-        app.setScreen.buttons["Pause"].tap()
+        app.setScreen.buttons["Pause"].tapSettled()
         XCTAssertTrue(app.pausedLayer.waitForExistence(timeout: defaultTimeout))
-        app.pausedLayer.buttons[UITestingContract.Identifier.pausedEndWorkout].tap()
+        app.pausedLayer.buttons[UITestingContract.Identifier.pausedEndWorkout].tapSettled()
 
         app.cancelConfirmation(label: "End Workout", excluding: UITestingContract.Identifier.pausedEndWorkout)
         XCTAssertTrue(app.pausedLayer.exists)
@@ -111,9 +112,9 @@ nonisolated final class SessionFlowUITests: XCTestCase {
         kg.increment()
         XCTAssertEqual(reps.value, "11")
         XCTAssertEqual(kg.value, "62.5 kilograms")
-        app.setScreen.buttons[UITestingContract.Identifier.setDone].tap()
+        app.setScreen.buttons[UITestingContract.Identifier.setDone].tapSettled()
         app.assertRestScreen()
-        app.restScreen.buttons["Skip Rest"].tap()
+        app.restScreen.buttons["Skip Rest"].tapSettled()
 
         // Second set: planned 8 × 62.5, typed 57.5.
         app.assertSetScreen(
@@ -123,22 +124,22 @@ nonisolated final class SessionFlowUITests: XCTestCase {
         XCTAssertEqual(kg2.value, "62.5 kilograms")
         kg2.focusField()
         app.dismissKeyboardIntroductionIfPresent()
-        kg2.field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8) + "57.5")
+        kg2.type("57.5", deleting: 8)
         let keyboardDone = app.toolbars.buttons["Done"]
         XCTAssertTrue(keyboardDone.waitForExistence(timeout: defaultTimeout), "no keyboard Done bar")
         keyboardDone.tap()
         XCTAssertTrue(keyboardDone.waitForNonExistence(), "the keyboard didn't close")
         XCTAssertEqual(kg2.value, "57.5 kilograms")
-        app.setScreen.buttons[UITestingContract.Identifier.setDone].tap()
+        app.setScreen.buttons[UITestingContract.Identifier.setDone].tapSettled()
 
         // "Long Rests" rests after every set, so the last Bench Press set is followed by a rest; then
         // Overhead Press opens, done as planned.
         app.assertRestScreen()
-        app.restScreen.buttons["Skip Rest"].tap()
+        app.restScreen.buttons["Skip Rest"].tapSettled()
         app.assertSetScreen(
             exercise: "Overhead Press",
             position: UITestingContract.Spoken.position(exercise: 2, of: 2, set: 1, of: 1))
-        app.setScreen.buttons[UITestingContract.Identifier.setDone].tap()
+        app.setScreen.buttons[UITestingContract.Identifier.setDone].tapSettled()
 
         app.assertSummary(title: UITestingContract.Spoken.workoutComplete)
         let volume = app.summaryVolume
@@ -156,7 +157,7 @@ nonisolated final class SessionFlowUITests: XCTestCase {
             exercise: "Bench Press",
             position: UITestingContract.Spoken.position(exercise: 1, of: 2, set: 1, of: 2))
 
-        app.setScreen.buttons["Skip Set"].tap()
+        app.setScreen.buttons["Skip Set"].tapSettled()
         app.assertSetScreen(
             exercise: "Bench Press",
             position: UITestingContract.Spoken.position(exercise: 1, of: 2, set: 2, of: 2))
@@ -184,7 +185,7 @@ nonisolated final class SessionFlowUITests: XCTestCase {
         kg.increment()
         XCTAssertEqual(reps.value, "11")
         XCTAssertEqual(kg.value, "62.5 kilograms")
-        app.setScreen.buttons[UITestingContract.Identifier.setDone].tap()
+        app.setScreen.buttons[UITestingContract.Identifier.setDone].tapSettled()
 
         app.assertRestScreen()
         let upNext = app.restScreen.descendants(matching: .any)
@@ -197,7 +198,7 @@ nonisolated final class SessionFlowUITests: XCTestCase {
         app.assertRestScreen()
 
         // Undo: the first set again, with the 11 reps entered before Done.
-        app.restScreen.buttons["Undo"].tap()
+        app.restScreen.buttons["Undo"].tapSettled()
         app.assertSetScreen(
             exercise: "Bench Press",
             position: UITestingContract.Spoken.position(exercise: 1, of: 2, set: 1, of: 2))
@@ -207,9 +208,9 @@ nonisolated final class SessionFlowUITests: XCTestCase {
         XCTAssertEqual(repsAfterUndo.value, "11")
         XCTAssertEqual(kgAfterUndo.value, "62.5 kilograms")
 
-        app.setScreen.buttons[UITestingContract.Identifier.setDone].tap()
+        app.setScreen.buttons[UITestingContract.Identifier.setDone].tapSettled()
         app.assertRestScreen()
-        app.restScreen.buttons["Skip Rest"].tap()
+        app.restScreen.buttons["Skip Rest"].tapSettled()
         app.assertSetScreen(
             exercise: "Bench Press",
             position: UITestingContract.Spoken.position(exercise: 1, of: 2, set: 2, of: 2))
