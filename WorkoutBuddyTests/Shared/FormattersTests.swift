@@ -95,18 +95,62 @@ struct FormattersTests {
         #expect(Formatters.committedKg(text: "  ", current: 22.5) == 22.5)
     }
 
-    @Test func needsTextRewrite() {
-        #expect(!Formatters.needsTextRewrite(text: "", value: 22.5, valueAtFocus: 22.5))
-        #expect(!Formatters.needsTextRewrite(text: "30.555", value: 22.5, valueAtFocus: 22.5))
-        #expect(Formatters.needsTextRewrite(text: "", value: 25, valueAtFocus: 22.5))
-        #expect(!Formatters.needsTextRewrite(text: "25", value: 25, valueAtFocus: 22.5))
-        #expect(!Formatters.needsTextRewrite(text: "22.3", value: 22.5, valueAtFocus: 20))
-        #expect(Formatters.needsTextRewrite(text: "22.5", value: 25, valueAtFocus: 20))
+    @Test func parseReps() {
+        #expect(Formatters.parseReps("10") == 10)
+        #expect(Formatters.parseReps("0") == 0)
+        #expect(Formatters.parseReps("007") == 7)
+        #expect(Formatters.parseReps(" 12 ") == 12)
+        #expect(Formatters.parseReps("") == nil)
+        #expect(Formatters.parseReps("  ") == nil)
+        #expect(Formatters.parseReps("-5") == nil)
+        #expect(Formatters.parseReps("+5") == nil)
+        #expect(Formatters.parseReps("1.5") == nil)
+        #expect(Formatters.parseReps("1,5") == nil)
+        #expect(Formatters.parseReps("1 000") == nil)
+        #expect(Formatters.parseReps("abc") == nil)
+        #expect(Formatters.parseReps("\u{0661}\u{0662}") == nil)  // Arabic-Indic digits
+        #expect(Formatters.parseReps("99999999999999999999") == nil)
+    }
+
+    @Test func committedReps() {
+        #expect(Formatters.committedReps(text: "12", current: 10) == 12)
+        #expect(Formatters.committedReps(text: "", current: 10) == 10)
+        #expect(Formatters.committedReps(text: "abc", current: 10) == 10)
+        #expect(Formatters.committedReps(text: "-3", current: 10) == 10)
+        #expect(Formatters.committedReps(text: "0", current: 10) == 1)
+        #expect(Formatters.committedReps(text: "150", current: 10) == 100)
+        #expect(Formatters.committedReps(text: "99999999999999999999", current: 10) == 10)
+        #expect(Formatters.committedReps(text: "100", current: 10) == 100)
+        #expect(Formatters.committedReps(text: "1", current: 10) == 1)
+    }
+
+    @Test func needsTextRewriteForKg() {
+        func needs(_ text: String, _ value: Double, _ valueAtFocus: Double) -> Bool {
+            NumericTextEditing<Double>.needsTextRewrite(
+                text: text, value: value, valueAtFocus: valueAtFocus, commit: Formatters.committedKg(text:current:))
+        }
+        #expect(!needs("", 22.5, 22.5))
+        #expect(!needs("30.555", 22.5, 22.5))
+        #expect(needs("", 25, 22.5))
+        #expect(!needs("25", 25, 22.5))
+        #expect(!needs("22.3", 22.5, 20))
+        #expect(needs("22.5", 25, 20))
+    }
+
+    @Test func needsTextRewriteForReps() {
+        func needs(_ text: String, _ value: Int, _ valueAtFocus: Int) -> Bool {
+            NumericTextEditing<Int>.needsTextRewrite(
+                text: text, value: value, valueAtFocus: valueAtFocus, commit: Formatters.committedReps(text:current:))
+        }
+        #expect(!needs("0", 1, 1))
+        #expect(!needs("150", 100, 100))
+        #expect(!needs("", 10, 10))
+        #expect(needs("12", 13, 12))
     }
 
     /// Covers only the pure keystroke path (not cursor placement, which shows only in a running app).
     /// Mirrors WeightField's per-keystroke handling: committedKg into the binding, then
-    /// needsTextRewrite on the resulting value (which must not rewrite the text mid-typing).
+    /// NumericTextEditing.needsTextRewrite on the resulting value (which must not rewrite the text mid-typing).
     private func typeKeystrokes(_ texts: [String], startingAt start: Double) -> [Double] {
         let valueAtFocus = start
         var kg = start
@@ -114,7 +158,8 @@ struct FormattersTests {
         for text in texts {
             let value = Formatters.committedKg(text: text, current: valueAtFocus)
             if value != kg { kg = value }
-            #expect(!Formatters.needsTextRewrite(text: text, value: kg, valueAtFocus: valueAtFocus), "\(text)")
+            #expect(!NumericTextEditing<Double>.needsTextRewrite(
+                text: text, value: kg, valueAtFocus: valueAtFocus, commit: Formatters.committedKg(text:current:)), "\(text)")
             committed.append(kg)
         }
         return committed
@@ -133,5 +178,53 @@ struct FormattersTests {
         #expect(AppSettings.snapKg(.infinity) == 0)
         #expect(AppSettings.snapKg(500.4) == 500)
         #expect(AppSettings.snapKg(0.25) == 0.5)
+    }
+
+    // MARK: Workout duration and volume
+
+    @Test func durationFormatting() {
+        #expect(Formatters.duration(seconds: 45, locale: us) == "45 sec")
+        #expect(Formatters.duration(seconds: 0, locale: us) == "0 sec")
+        #expect(Formatters.duration(seconds: -5, locale: us) == "0 sec")
+        #expect(Formatters.duration(seconds: 59, locale: us) == "59 sec")
+        #expect(Formatters.duration(seconds: 60, locale: us) == "1 min")
+        #expect(Formatters.duration(seconds: 12 * 60 + 40, locale: us) == "12 min")
+        #expect(Formatters.duration(seconds: 3600, locale: us) == "1 hr")
+        #expect(Formatters.duration(seconds: 3900, locale: us) == "1 hr, 5 min")
+        #expect(Formatters.duration(seconds: 3600 + 5 * 60 + 59, locale: us) == "1 hr, 5 min")
+        #expect(Formatters.duration(seconds: 3599, locale: us) == "59 min")
+        #expect(Formatters.duration(seconds: 2 * 3600 + 30 * 60, locale: us) == "2 hr, 30 min")
+    }
+
+    @Test func spokenWorkoutDurationFormatting() {
+        #expect(Formatters.spokenWorkoutDuration(seconds: 45, locale: us) == "45 seconds")
+        #expect(Formatters.spokenWorkoutDuration(seconds: 1, locale: us) == "1 second")
+        #expect(Formatters.spokenWorkoutDuration(seconds: 3900, locale: us) == "1 hour, 5 minutes")
+        #expect(Formatters.spokenWorkoutDuration(seconds: 60, locale: us) == "1 minute")
+        #expect(Formatters.spokenWorkoutDuration(seconds: 7200, locale: us) == "2 hours")
+    }
+
+    @Test func volumeFormatting() {
+        #expect(Formatters.volume(4250, locale: us) == "4,250\u{00A0}kg")
+        #expect(Formatters.volume(4250, locale: enCZ) == "4\u{00A0}250\u{00A0}kg")
+        #expect(Formatters.volume(157.5, locale: us) == "157.5\u{00A0}kg")
+        #expect(Formatters.volume(157.5, locale: enCZ) == "157,5\u{00A0}kg")
+        #expect(Formatters.volume(0, locale: us) == "0\u{00A0}kg")
+    }
+
+    @Test func spokenKilogramsFormatting() {
+        #expect(Formatters.spokenKilograms(0, locale: us) == "0 kilograms")
+        #expect(Formatters.spokenKilograms(1, locale: us) == "1 kilogram")
+        #expect(Formatters.spokenKilograms(22.5, locale: us) == "22.5 kilograms")
+        #expect(Formatters.spokenKilograms(22.5, locale: enCZ) == "22,5 kilograms")
+        #expect(Formatters.spokenKilograms(60, locale: us) == "60 kilograms")
+        #expect(Formatters.spokenKilograms(0.5, locale: us) == "0.5 kilograms")
+    }
+
+    @Test func spokenVolumeFormatting() {
+        #expect(Formatters.spokenVolume(4250, locale: us) == "4,250 kilograms")
+        #expect(Formatters.spokenVolume(1, locale: us) == "1 kilogram")
+        #expect(Formatters.spokenVolume(0, locale: us) == "0 kilograms")
+        #expect(Formatters.spokenVolume(157.5, locale: enCZ) == "157,5 kilograms")
     }
 }

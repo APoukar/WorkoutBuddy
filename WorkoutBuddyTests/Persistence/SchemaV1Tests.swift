@@ -227,6 +227,47 @@ struct SchemaV1Tests {
         #expect(fetchedWorkout.updatedAt == updated)
     }
 
+    @Test func sessionPauseAndRestFieldsDefaultToNil() throws {
+        let t = try TestContainer()
+        let session = WorkoutSession(workout: nil)
+        t.context.insert(session)
+        try t.context.save()
+
+        #expect(session.pausedAt == nil)
+        #expect(session.restEndsAt == nil)
+        #expect(session.lastActionAt == nil)
+    }
+
+    @Test func sessionPauseAndRestFieldsPersistAfterSaveAndFreshFetch() throws {
+        let t = try TestContainer()
+        let paused = Date(timeIntervalSince1970: 1_000_000)
+        let restEnds = Date(timeIntervalSince1970: 1_000_090)
+        let lastAction = Date(timeIntervalSince1970: 1_000_050)
+        let session = WorkoutSession(workout: nil, pausedAt: paused, restEndsAt: restEnds, lastActionAt: lastAction)
+        t.context.insert(session)
+        try t.context.save()
+
+        let freshContext = ModelContext(t.container)
+        let sessionID = session.id
+        let fetched = try #require(
+            try freshContext.fetch(FetchDescriptor<WorkoutSession>(predicate: #Predicate { $0.id == sessionID })).first)
+        #expect(fetched.pausedAt == paused)
+        #expect(fetched.restEndsAt == restEnds)
+        #expect(fetched.lastActionAt == lastAction)
+
+        fetched.pausedAt = nil
+        fetched.restEndsAt = nil
+        fetched.lastActionAt = nil
+        try freshContext.save()
+
+        let again = ModelContext(t.container)
+        let refetched = try #require(
+            try again.fetch(FetchDescriptor<WorkoutSession>(predicate: #Predicate { $0.id == sessionID })).first)
+        #expect(refetched.pausedAt == nil)
+        #expect(refetched.restEndsAt == nil)
+        #expect(refetched.lastActionAt == nil)
+    }
+
     @Test func settingDefaultsBackToNilPersists() throws {
         let t = try TestContainer()
         let exercise = Exercise(

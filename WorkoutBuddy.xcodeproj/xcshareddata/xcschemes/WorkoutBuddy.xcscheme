@@ -40,6 +40,17 @@
                ReferencedContainer = "container:WorkoutBuddy.xcodeproj">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "7A0000000000000000000023"
+               BuildableName = "WorkoutBuddyUITests.xctest"
+               BlueprintName = "WorkoutBuddyUITests"
+               ReferencedContainer = "container:WorkoutBuddy.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

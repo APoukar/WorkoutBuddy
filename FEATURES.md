@@ -50,8 +50,9 @@ A personal iPhone app for planning gym workouts, running them set by set with gu
   - If the rest period is 0, or it was the last set of the workout, there is no rest screen.
 - **Skip set:** the set is saved as *skipped* and the next set opens right away (no rest).
 - **Pause:** freezes the overall timer and any rest countdown. A paused overlay offers **Resume** and **End workout**.
-- **End early:** asks for confirmation. Remaining sets are saved as *not performed*, and the session is saved. If no set was completed, the app offers to **discard** the session instead.
-- **Robustness:** timers are calculated from stored timestamps, not by counting ticks, so they stay correct in the background. Session progress is saved after every action. If the app is killed, the next launch offers **Resume** or **End & save**.
+- **End early:** asks for confirmation, then shows the summary (F5); when it's saved, the remaining sets are saved as *not performed*. If no set was completed, the app offers to **discard** the session instead (see F5: a workout with no completed set is never saved).
+- **Earlier sets:** on the set screen or the summary, swipe right (or tap Previous Set / Review Sets) to look back at finished sets. A done set's reps and kg can be corrected, a skipped set can be marked as done and a done set as skipped; the workout's position and timers don't change.
+- **Robustness:** timers are calculated from stored timestamps, not by counting ticks, so they stay correct in the background. Session progress is saved after every action. If the app is killed, the next launch offers **Resume** or **End** (which shows the summary, where **Save** stores it).
 
 ### F4 — Lock Screen & background
 - **Live Activity** (Lock Screen + Dynamic Island) while a session runs:
@@ -63,7 +64,9 @@ A personal iPhone app for planning gym workouts, running them set by set with gu
 
 ### F5 — Workout summary
 - Shown when the last set finishes or the workout ends early: total duration (excluding pauses), sets completed / skipped, total volume (Σ reps × kg) and **new personal records** hit in this session.
-- **Save** stores it to history. A session that ends early is marked as such.
+- **Save** stores it to history. A session that ends early is marked as such, and its remaining sets are saved as *not performed*.
+- **A workout with no completed set is never saved.** This covers ending early with nothing done and finishing with every set skipped: the summary offers **Discard Workout** instead of Save, and the title reads "Workout Ended". After a kill, such a workout is offered **Resume** or **Discard**.
+- **Back to Workout** returns to the workout from the summary. The time spent on the summary doesn't count towards the duration.
 
 ### F6 — History calendar
 - **History tab**: month calendar, swipeable between months, with today highlighted. Days with at least one finished session show a **dot**.
@@ -98,7 +101,7 @@ A personal iPhone app for planning gym workouts, running them set by set with gu
 ## 4. Conceptual data model
 - **Exercise**: id, name, muscleGroup, isCustom, isArchived, optional defaultReps / defaultKg / defaultRestSeconds
 - **Workout** (template): id, name, createdAt, updatedAt (last saved in the editor; used for "values last used in a template"), isSoftDeleted (named so because SwiftData models already have an `isDeleted` property), sessions (inverse of the session's workout ref) → ordered **WorkoutExercise** (exercise ref) → ordered **PlannedSet** (reps, kg, restSeconds)
-- **WorkoutSession**: id, workout ref, startedAt, endedAt, pausedDuration, status (inProgress / completed / endedEarly) → ordered **SessionExercise** (exercise ref) → ordered **SessionSet** (planned reps/kg/rest, actual reps/kg, status pending / done / skipped / notPerformed, completedAt)
+- **WorkoutSession**: id, workout ref, startedAt, endedAt, pausedDuration, pausedAt, restEndsAt and lastActionAt (only used while a session runs), status (inProgress / completed / endedEarly) → ordered **SessionExercise** (exercise ref) → ordered **SessionSet** (planned reps/kg/rest, actual reps/kg, status pending / done / skipped / notPerformed, completedAt = when it was done or skipped)
 - Rules:
   - Sessions **copy the planned numbers**, because templates can change later.
   - Names are **not** copied. They're looked up through references, and workouts and exercises are soft-deleted so those references keep working.
@@ -107,7 +110,7 @@ A personal iPhone app for planning gym workouts, running them set by set with gu
 Apple Watch app · iPad · iCloud sync / import · HealthKit · interactive Live Activity buttons (Done / Skip from Lock Screen) · "last time" hints during a session (showing what you lifted last time; this is separate from the first-set defaults in F2) · supersets / warm-up sets · lbs · Czech localization · +30 s rest extension.
 
 ## 6. Open points (defaults chosen, revisit when planning)
-- **Accidental Done:** default is an **Undo** button on the rest screen that returns to the set.
+- **Accidental Done:** default is an **Undo** button on the rest screen that returns to the set. For the last set, which has no rest screen, **Back to Workout** on the summary does the same.
 - **Weight changed mid-exercise:** a change applies to the current set only and doesn't carry over to the remaining sets.
 - **"Values last used in a template" (F2):** the first set of that exercise in the template that was saved most recently, among active templates. Confirmed in phase 2 planning.
 

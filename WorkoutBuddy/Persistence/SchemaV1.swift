@@ -132,6 +132,13 @@ nonisolated enum SchemaV1: VersionedSchema {
         var startedAt: Date = Date.now
         var endedAt: Date?
         var pausedDuration: TimeInterval = 0
+        /// Set while the workout is paused; the pause is folded into `pausedDuration` on resume or finish.
+        var pausedAt: Date?
+        /// Set while a rest countdown runs (and, once it has expired, until the next action clears it).
+        var restEndsAt: Date?
+        /// When the user last did anything (Done, Skip, Pause, Resume, ...). Used to end an interrupted
+        /// workout at a sensible time. `nil` for a session that was never acted on.
+        var lastActionAt: Date?
         var statusRaw: String = SessionStatus.inProgress.rawValue
 
         @Relationship(deleteRule: .cascade, inverse: \SessionExercise.session)
@@ -148,13 +155,17 @@ nonisolated enum SchemaV1: VersionedSchema {
 
         init(
             id: UUID = UUID(), workout: Workout?, startedAt: Date = .now, endedAt: Date? = nil,
-            pausedDuration: TimeInterval = 0, status: SessionStatus = .inProgress
+            pausedDuration: TimeInterval = 0, pausedAt: Date? = nil, restEndsAt: Date? = nil,
+            lastActionAt: Date? = nil, status: SessionStatus = .inProgress
         ) {
             self.id = id
             self.workout = workout
             self.startedAt = startedAt
             self.endedAt = endedAt
             self.pausedDuration = pausedDuration
+            self.pausedAt = pausedAt
+            self.restEndsAt = restEndsAt
+            self.lastActionAt = lastActionAt
             self.statusRaw = status.rawValue
         }
     }
@@ -191,6 +202,7 @@ nonisolated enum SchemaV1: VersionedSchema {
         var actualReps: Int?
         var actualKg: Double?
         var statusRaw: String = SetStatus.pending.rawValue
+        /// When the set was resolved (done or skipped).
         var completedAt: Date?
 
         var status: SetStatus {

@@ -13,6 +13,7 @@ struct WorkoutDetailView: View {
     /// Set by the editor when it deleted the template. Checked when the sheet has dismissed, so the pop
     /// happens once, after the sheet is gone, not underneath it.
     @State private var deletedInEditor = false
+    @State private var error: Error?
 
     private var library: WorkoutLibrary { WorkoutLibrary(context: context) }
 
@@ -43,7 +44,22 @@ struct WorkoutDetailView: View {
                 }
             }
         }
-        .startBar(canStart: canStart)
+        .bottomActionBar {
+            Button {
+                start()
+            } label: {
+                Text("Start Workout").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(!WorkoutDetailRules.isStartEnabled(canStart: canStart, isSoftDeleted: workout.isSoftDeleted))
+            if !canStart {
+                Text(WorkoutDetailRules.cannotStartHint)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+        }
         .navigationTitle(workout.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -51,6 +67,7 @@ struct WorkoutDetailView: View {
                 Button("Edit") { editing = true }
             }
         }
+        .errorAlert($error, message: SessionMessages.failureMessage(for:))
         .sheet(isPresented: $editing, onDismiss: editorDismissed) {
             WorkoutEditorView(workout: workout, onDeleted: { deletedInEditor = true })
         }
@@ -88,50 +105,26 @@ struct WorkoutDetailView: View {
         .accessibilityLabel(WorkoutDetailRules.setAccessibilityLabel(forSetAt: index, values: values))
     }
 
+    /// Starts a session. The full-screen session follows from the store (`RootTabView`), so there's nothing
+    /// to present here.
+    private func start() {
+        do {
+            try SessionLibrary(context: context).start(workout)
+        } catch SessionError.alreadyActive {
+            // A second tap while the session is opening. An alert here would knock the full-screen
+            // session away, so it's logged only.
+            ErrorLogging.log(SessionError.alreadyActive, action: "Start workout (already active)", category: "session")
+        } catch {
+            ErrorLogging.log(error, action: "Start workout", category: "session")
+            self.error = error
+        }
+    }
+
     private func editorDismissed() {
         guard deletedInEditor else { return }
         deletedInEditor = false
         onDeleted()
     }
-}
-
-/// Pins the Start Workout button at the bottom. From iOS 26 the system bar and its scroll-edge effect are used;
-/// before that, a button over a `.bar` background keeps scrolling rows from showing through.
-private struct StartBar: ViewModifier {
-    let canStart: Bool
-
-    func body(content: Content) -> some View {
-        if #available(iOS 26, *) {
-            content.safeAreaBar(edge: .bottom, spacing: 0) { bar }
-        } else {
-            content.safeAreaInset(edge: .bottom, spacing: 0) { bar.background(.bar) }
-        }
-    }
-
-    private var bar: some View {
-        VStack(spacing: 8) {
-            Button {
-                // Starting a session comes in phase 3.
-            } label: {
-                Text("Start Workout").frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(!canStart)
-            if !canStart {
-                Text(WorkoutDetailRules.cannotStartHint)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-        }
-        .padding()
-        .frame(maxWidth: .infinity)
-    }
-}
-
-private extension View {
-    func startBar(canStart: Bool) -> some View { modifier(StartBar(canStart: canStart)) }
 }
 
 private struct DetailPreview: View {
