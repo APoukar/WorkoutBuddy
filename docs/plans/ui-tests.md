@@ -252,3 +252,5 @@ As in `CLAUDE.md`, with the findings discussed with the user before anything cha
 3. Inaccurate doc comment ("one snapshot read") → corrected.
 4. An ambiguous query also reads as "missing or off screen" → the messages say "missing, off screen or ambiguous".
 5. The strict `waitUntilSettled` was still callable and the step 7b text read as a hard requirement → `waitUntilSettled` is private; step 7b points to this decision.
+
+**CI verified (run 43183858778, 2026-11-12, commit a5ff93c, iOS 27.2):** green. Unit tests about 2 min; UI tests 22 of 22 passed in 19 min 40 s; the job about 24 min (timeout 45). Whether the keyboard-introduction setting itself takes effect on iOS 27 isn't confirmed; the launch helper's dismissal stays the safeguard. The UI test work is done; phase 4 starts in its own session.
