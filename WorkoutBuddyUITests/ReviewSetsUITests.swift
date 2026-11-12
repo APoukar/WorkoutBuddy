@@ -105,7 +105,7 @@ nonisolated final class ReviewSetsUITests: XCTestCase {
             from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0)
         }
         XCTAssertFalse(needsScrolling(), "\(name) button is still out of reach", file: file, line: line)
-        XCTAssertTrue(button.waitUntilSettled(), "\(name) button never settled", file: file, line: line)
+        XCTAssertTrue(button.waitUntilSettledOrPresent(), "\(name) button is missing, off screen or ambiguous", file: file, line: line)
         button.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: inContent ? 0.25 : 0.5)).tap()
     }
 

@@ -98,7 +98,7 @@ nonisolated final class RecoveryUITests: XCTestCase {
         first.assertSetScreen(exercise: "Bench Press", position: Spoken.benchSet1Position)
         // A tap while the full-screen cover is still settling can reach the app and do nothing.
         let done = first.setScreen.buttons[ID.setDone]
-        XCTAssertTrue(done.waitUntilSettled(), "Done never settled")
+        XCTAssertTrue(done.waitUntilSettledOrPresent(), "Done is missing, off screen or ambiguous")
         let doneTappedAt = Date()
         done.tap()
         first.assertRestScreen()

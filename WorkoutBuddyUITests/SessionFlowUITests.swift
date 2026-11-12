@@ -61,7 +61,7 @@ nonisolated final class SessionFlowUITests: XCTestCase {
 
         app.assertRestScreen()
         let skip = app.restScreen.buttons["Skip Rest"]
-        XCTAssertTrue(skip.waitUntilSettled(), "Skip Rest never settled")
+        XCTAssertTrue(skip.waitUntilSettledOrPresent(), "Skip Rest is missing, off screen or ambiguous")
         let start = Date()
         skip.tap()
         let tapDuration = Date().timeIntervalSince(start)

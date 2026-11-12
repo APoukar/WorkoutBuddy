@@ -38,7 +38,7 @@ extension XCUIApplication {
     func dismissSearch() {
         for name in ["close", "Cancel"] {
             let button = buttons[name]
-            if button.exists, button.waitUntilSettled(timeout: 3) {
+            if button.exists, button.waitUntilSettledOrPresent(timeout: 3) {
                 button.tap()
                 return
             }

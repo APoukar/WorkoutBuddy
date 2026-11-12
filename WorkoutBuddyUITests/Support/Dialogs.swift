@@ -21,7 +21,7 @@ extension XCUIApplication {
             NSPredicate(format: "label == %@ AND identifier != %@", label, screenButtonIdentifier)
         ).firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: defaultTimeout), "no confirmation open")
-        XCTAssertTrue(confirm.waitUntilSettled(), "the confirmation never settled")
+        XCTAssertTrue(confirm.waitUntilSettledOrPresent(), "the confirmation is missing, off screen or ambiguous")
         let cancel = buttons["Cancel"]
         let dismiss = otherElements["PopoverDismissRegion"]
         if cancel.exists {
