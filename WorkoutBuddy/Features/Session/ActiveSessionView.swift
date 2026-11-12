@@ -67,7 +67,7 @@ struct ActiveSessionView: View {
         let screen = snapshot.screen(now: now)
         let key = SessionScreenKey(screen, in: snapshot)
         let paused = snapshot.isPaused
-        let names = exerciseNames(of: session)
+        let names = library.exerciseNames(of: session)
         let workoutName = session.workout?.name ?? SessionMessages.fallbackWorkoutName
         // A finished workout is never shown as paused.
         let timer = ElapsedTimerInfo(
@@ -251,12 +251,6 @@ struct ActiveSessionView: View {
                 onReview: newestReviewable.map { id in { showReview(id, from: .left) } })
             .layerIdentifier(UITestingContract.Identifier.summary)
         }
-    }
-
-    /// Exercise names by ID, looked up through the references (names are never copied into a session).
-    private func exerciseNames(of session: WorkoutSession) -> [UUID: String] {
-        let pairs = session.orderedExercises.compactMap { row in row.exercise.map { ($0.id, $0.name) } }
-        return Dictionary(pairs, uniquingKeysWith: { first, _ in first })
     }
 
     // MARK: Actions
