@@ -13,7 +13,7 @@ concurrency:
 jobs:
   build-and-test:
     runs-on: xcode-27
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
 
@@ -31,8 +31,10 @@ jobs:
           UDID=$(xcrun simctl create "CI iPhone 17" "iPhone 17" "$RUNTIME")
           echo "Created $UDID on $RUNTIME"
           echo "DESTINATION=platform=iOS Simulator,id=$UDID" >> "$GITHUB_ENV"
+          echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
 
       - name: Build
+        id: build
         run: >
           xcodebuild build-for-testing
           -project WorkoutBuddy.xcodeproj
@@ -51,14 +53,41 @@ jobs:
           -derivedDataPath DerivedData-Release
           -quiet
 
-      - name: Test
+      # Both test steps run whenever the Debug build succeeded, even if the
+      # Release build or the other test step failed, so both results show.
+      - name: Unit tests
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: >
           xcodebuild test-without-building
           -project WorkoutBuddy.xcodeproj
           -scheme WorkoutBuddy
           -destination "$DESTINATION"
           -derivedDataPath DerivedData
-          -resultBundlePath TestResults.xcresult
+          -only-testing:WorkoutBuddyTests
+          -resultBundlePath UnitTests.xcresult
+          -quiet
+
+      # Boots the simulator before the UI tests (the unit tests run on clones of
+      # it) and turns off the keyboard introduction ("Speed up your typing"),
+      # which on a fresh simulator can cover the keys in the UI tests.
+      - name: Boot simulator
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          xcrun simctl bootstatus "$SIM_UDID" -b
+          xcrun simctl spawn "$SIM_UDID" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true
+
+      # No retries: a flaky UI test is a bug to fix.
+      - name: UI tests
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: >
+          xcodebuild test-without-building
+          -project WorkoutBuddy.xcodeproj
+          -scheme WorkoutBuddy
+          -destination "$DESTINATION"
+          -derivedDataPath DerivedData
+          -only-testing:WorkoutBuddyUITests
+          -parallel-testing-enabled NO
+          -resultBundlePath UITests.xcresult
           -quiet
 
       - name: Upload test results
@@ -66,4 +95,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: TestResults
-          path: TestResults.xcresult
+          path: |
+            UnitTests.xcresult
+            UITests.xcresult
+          if-no-files-found: ignore

@@ -238,3 +238,8 @@ As in `CLAUDE.md`, with the findings discussed with the user before anything cha
 7. The settle's doc comment → says the expectation polls about once a second, which is what covers fades, and each settle costs about 1 s.
 8. Redundant settles → only the confirmation's Cancel tap after an already settled confirm becomes a plain tap; the settles before Done on a screen already showing stay (about 1 s each, cheap insurance on CI).
 9. The value predicate was built by string interpolation → `NSPredicate(format: "value == %@", …)`.
+
+**Step 8 code review (2026-11-12), verdict "Approve with fixes", 2 minor findings and 1 question, discussed with the user; all settled as recommended:**
+1. The Boot simulator step ran before the unit tests (which run on clones) and was skipped when the Release build failed, while the UI tests still ran → moved directly before the UI tests, with the UI step's condition (`!cancelled() && steps.build.outcome == 'success'`).
+2. Nothing confirms the `DidShowContinuousPathIntroduction` setting suppresses the keyboard introduction on iOS 27 → kept as the first line of defence; the launch helper still dismisses the introduction. Checked after the first CI run.
+3. A Release-only failure skipped the unit tests but ran the UI tests → the unit test step gets the same condition, so both results always show.
