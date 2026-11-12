@@ -13,6 +13,7 @@ struct RootTabView: View {
     /// recovery only change the store; the cover follows.
     @Query private var activeSessions: [WorkoutSession]
     @Environment(\.modelContext) private var context
+    @Environment(\.scenePhase) private var scenePhase
     @State private var launchCheckDone = RootTabView.launchCheckRan
     /// The interrupted workout waiting for an answer. The cover stays away while it's set. The alert is
     /// driven by it, so any plain dismissal counts as Resume and it can't get stuck.
@@ -63,6 +64,9 @@ struct RootTabView: View {
             }
         }
         .task { runLaunchCheck() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { reportAppBecameActive() }
+        }
         .fullScreenCover(item: cover) { cover in
             ActiveSessionView(sessionID: cover.id)
                 .interactiveDismissDisabled()
@@ -95,6 +99,8 @@ struct RootTabView: View {
         }
         Self.launchCheckRan = true
         defer { launchCheckDone = true }
+        // A launch is always in the foreground, so it counts as coming back to the app.
+        reportAppBecameActive()
         do {
             guard let session = try library.activeSession() else { return }
             let decision = LaunchRecovery.decide(library.snapshot(of: session))
@@ -103,6 +109,17 @@ struct RootTabView: View {
         } catch {
             ErrorLogging.log(error, action: "Launch recovery check", category: "session")
             self.error = error
+        }
+    }
+
+    /// Tells the effects the app became active (or launched), so the notification matches the stored
+    /// session again and an old delivered "Rest Over" is removed. A failed read is logged and skipped.
+    private func reportAppBecameActive() {
+        let library = library
+        do {
+            library.effects.appBecameActive(try library.effectsState())
+        } catch {
+            ErrorLogging.log(error, action: "Read session state for effects", category: "session")
         }
     }
 

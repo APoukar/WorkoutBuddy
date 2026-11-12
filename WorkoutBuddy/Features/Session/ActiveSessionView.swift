@@ -47,9 +47,10 @@ struct ActiveSessionView: View {
         }
         .background(.background)
         .errorAlert($error, message: SessionMessages.failureMessage(for:))
-        // Waits for the rest to end, then clears it and (in the foreground) plays the alert. Keyed on the
-        // end time only, so it restarts when a rest starts, moves (resume) or is cleared, and is
-        // cancelled by pause, skip and undo.
+        // Waits for the rest to end, then clears it in the foreground (the alert itself comes from the
+        // rest-end notification, or from here when none covers the rest). Keyed on the end time only, so
+        // it restarts when a rest starts, moves (resume) or is cleared, and is cancelled by pause, skip
+        // and undo.
         .task(id: snapshot?.autoAdvanceDeadline) {
             if let endsAt = snapshot?.autoAdvanceDeadline { await autoAdvance(endsAt: endsAt) }
         }
@@ -288,9 +289,13 @@ struct ActiveSessionView: View {
 
     // MARK: Rest end
 
-    /// Sleeps until `endsAt`, then clears the rest (which opens the next set). The haptic and sound play
-    /// only if the app noticed the end within a couple of seconds and is in the foreground; after a
-    /// stay in the background the next set just shows.
+    /// Sleeps until `endsAt`, then clears the rest (which opens the next set). Who alerts is decided once,
+    /// at delivery: when a rest-end notification covers this rest, the system shows the banner or the
+    /// delegate plays the in-app alert, so nothing plays here. Only an uncovered rest (permission denied,
+    /// failed schedule, tests) gets the haptic and sound from here, if the app noticed the end within a
+    /// couple of seconds and isn't in the background. In the background the rest is left stored, so the
+    /// notification isn't cancelled as it fires; the `.active` scene-phase handler clears it (silently)
+    /// when the app comes back, so the task simply ends here.
     private func autoAdvance(endsAt: Date) async {
         while Date.now < endsAt {
             do { try await Task.sleep(for: .seconds(max(endsAt.timeIntervalSinceNow, 0.01))) } catch { return }
@@ -299,7 +304,12 @@ struct ActiveSessionView: View {
         guard !Task.isCancelled, let session = freshSession(),
             library.snapshot(of: session).restEndsAt == endsAt
         else { return }
-        let inForeground = UIApplication.shared.applicationState == .active
+        // Asked before `finishRest`: clearing the rest reconciles and may change the answer.
+        let covered = library.effects.restEndAlertIsCovered(restEndsAt: endsAt)
+        let action = RestAlertRules.action(
+            appState: .init(UIApplication.shared.applicationState), restEndsAt: endsAt, noticedAt: noticedAt,
+            covered: covered)
+        guard action != .leaveStored else { return }
         do {
             try library.finishRest(in: session, now: noticedAt)
         } catch {
@@ -307,9 +317,7 @@ struct ActiveSessionView: View {
             self.error = error
             return
         }
-        if inForeground, RestAlertRules.shouldPlayAlert(restEndsAt: endsAt, noticedAt: noticedAt) {
-            RestAlert.play()
-        }
+        if action == .clearAndPlayAlert { RestAlert.play() }
     }
 
     /// Coming back to the app: clears a rest that ran out meanwhile, silently, so the next set shows.

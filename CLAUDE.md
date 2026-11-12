@@ -25,11 +25,11 @@ xcodebuild test -project WorkoutBuddy.xcodeproj -scheme WorkoutBuddy -destinatio
 xcodebuild test -project WorkoutBuddy.xcodeproj -scheme WorkoutBuddy -destination 'platform=iOS Simulator,name=iPhone 17,OS=27.0' -quiet -only-testing:WorkoutBuddyUITests/<ClassName> -test-iterations 3 -run-tests-until-failure
 ```
 
-To check behaviour on the minimum OS, use `-destination 'platform=iOS Simulator,name=iPhone 16,OS=18.2'`, with `-parallel-testing-enabled NO` (otherwise cloning the simulator sometimes fails).
+Tests and manual checks run on iOS 27 only (the user's decision, 2026-11-12: the app is for their own iPhone, which runs iOS 27). The deployment target is still iOS 18 (raising it to 27 is a planned task in `FEATURES.md` §7), so the compiler still requires `if #available` around newer APIs, but the `else` branch needs no real iOS 18 fallback: keep it as small as possible (nothing, or the simplest thing that compiles). If a minimum-OS check is ever needed, use `-destination 'platform=iOS Simulator,name=iPhone 16,OS=18.2'` with `-parallel-testing-enabled NO` (otherwise cloning the simulator sometimes fails).
 
-A plain `xcodebuild test` without `-only-testing` runs both the unit and the UI tests. The UI tests take minutes, so run them for steps that touch views or the UI tests themselves; the code reviewer runs them on both OS versions. Count tests from the `.xcresult` (`xcrun xcresulttool get test-results summary --path <bundle>`), not the console log.
+A plain `xcodebuild test` without `-only-testing` runs both the unit and the UI tests. The UI tests take minutes, so run them for steps that touch views or the UI tests themselves; the code reviewer runs them on iOS 27 (no iOS 18.2 runs). Count tests from the `.xcresult` (`xcrun xcresulttool get test-results summary --path <bundle>`), not the console log.
 
-**CI:** `.github/workflows/ci.yml` builds the app (Debug, plus a Release build to catch code that only compiles in Debug), then runs the unit tests and the UI tests as separate steps on the same simulator, on every pull request and every push to `main`. The UI tests run even if the unit tests failed, so both results show. It runs on GitHub's `xcode-27` runner, using iPhone 17 on the latest iOS simulator. CI doesn't test on iOS 18, so the minimum-OS check above, including the UI tests on iOS 18.2, is still done locally. If a test fails, the `.xcresult` bundles (`UnitTests` and `UITests`) are uploaded as run artifacts.
+**CI:** `.github/workflows/ci.yml` builds the app (Debug, plus a Release build to catch code that only compiles in Debug), then runs the unit tests and the UI tests as separate steps on the same simulator, on every pull request and every push to `main`. The UI tests run even if the unit tests failed, so both results show. It runs on GitHub's `xcode-27` runner, using iPhone 17 on the latest iOS simulator. CI doesn't test on iOS 18, and neither do local runs (see above). If a test fails, the `.xcresult` bundles (`UnitTests` and `UITests`) are uploaded as run artifacts.
 
 ## Project setup
 - Targets: `WorkoutBuddy` (app, `net.poukar.WorkoutBuddy`), `WorkoutBuddyTests` (unit tests, hosted in the app) and `WorkoutBuddyUITests` (XCUITest UI tests, not parallelized; see `docs/plans/ui-tests.md`). A widget extension for the Live Activity comes in phase 4.
@@ -37,7 +37,7 @@ A plain `xcodebuild test` without `-only-testing` runs both the unit and the UI 
 - All three targets use Swift 6 language mode with **default actor isolation set to `MainActor`** and Approachable Concurrency. Types and functions are `@MainActor` unless marked `nonisolated`; mark pure logic `nonisolated` when it must run off the main actor.
 - Unit tests use Swift Testing (`import Testing`, `@Test`, `#expect`). SwiftData tests use an in-memory `ModelContainer`.
 - UI tests use XCTest (`XCUIApplication` needs `XCTestCase`). Test classes are `nonisolated` (the `XCTestCase` initializers and `setUp` are), and the test methods are `@MainActor`.
-- Portrait only. Any API newer than iOS 18 needs `if #available` with an iOS 18 fallback.
+- Portrait only. Any API newer than iOS 18 needs `if #available` (the compiler requires it while the target is iOS 18), but no designed iOS 18 fallback: the `else` branch stays minimal.
 
 ## Rules that span the whole app
 These come from `FEATURES.md` and affect most features, so keep them in mind even when a change looks local:

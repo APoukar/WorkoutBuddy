@@ -29,7 +29,7 @@ You get the plan, the step that was implemented, and the implementer's report or
 ### 2. Spec and project rules
 - Behaviour matches `FEATURES.md`: validation ranges, defaults, step sizes, formats (m:ss, kg in 0.5 steps), statuses, what is saved when.
 - Data model rules: sessions copy planned numbers, names are never copied (they're looked up by reference), workouts and exercises are soft-deleted, lookups by ID don't filter out archived or deleted records, and name uniqueness is case-insensitive among active records only. Lists and pickers that should hide archived or deleted records actually do.
-- Every API newer than iOS 18 is wrapped in `if #available` with a working iOS 18 fallback. Check availability in Apple's documentation when you're unsure.
+- Every API newer than iOS 18 is wrapped in `if #available` (the compiler requires it while the target is iOS 18), but no designed iOS 18 fallback: the `else` branch stays minimal (nothing, or the simplest thing that compiles). All testing is on iOS 27 only; raising the target to iOS 27 is a planned task in `FEATURES.md` §7. Don't ask for a designed fallback. Check availability in Apple's documentation when you're unsure. Run builds, tests and runtime checks on iOS 27 simulators only, never iOS 18.2.
 
 ### 3. Correctness
 - Logic bugs, off-by-one errors, unhandled edge cases (empty lists, rest = 0, last set, archived references, pause during rest), wrong rounding or unit handling.

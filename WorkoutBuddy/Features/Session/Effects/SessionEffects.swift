@@ -22,17 +22,28 @@ nonisolated enum NotificationAuthorization: Equatable, Sendable {
 @MainActor
 protocol SessionEffects {
     func sessionChanged(_ state: SessionEffectsState)
+    /// The "came back to the app" reconcile: the same as `sessionChanged`, and it also removes rest-end
+    /// notifications already delivered. Called at launch and when the app becomes active.
+    func appBecameActive(_ state: SessionEffectsState)
     /// Asks for notification permission if it hasn't been asked yet. Called after a successful Start.
     func requestNotificationPermissionIfNeeded()
     func notificationAuthorization() async -> NotificationAuthorization
+    /// Whether a rest-end notification will alert for the rest ending at `restEndsAt` (a schedule for that
+    /// date succeeded and wasn't cancelled before it). When it does, the system decides who alerts at
+    /// delivery, so the app doesn't play its own alert when it notices the end. Asked before the rest is
+    /// cleared, because clearing it reconciles and may change the answer.
+    func restEndAlertIsCovered(restEndsAt: Date) -> Bool
 }
 
 /// Does nothing. Used by unit tests, UI-testing mode and previews, so they never schedule notifications,
 /// show Live Activities or raise the permission prompt. It reports `.allowed`, so nothing permission-related shows.
 struct NoSessionEffects: SessionEffects {
     func sessionChanged(_ state: SessionEffectsState) {}
+    func appBecameActive(_ state: SessionEffectsState) {}
     func requestNotificationPermissionIfNeeded() {}
     func notificationAuthorization() async -> NotificationAuthorization { .allowed }
+    /// Nothing is ever scheduled, so the app plays the alert itself (phase 3 behaviour).
+    func restEndAlertIsCovered(restEndsAt: Date) -> Bool { false }
 }
 
 /// Where the default `SessionEffects` comes from. The test / UI-testing / preview gate lives here, in one place.
@@ -41,9 +52,14 @@ enum SessionEffectsProvider {
         if isInert(environment: ProcessInfo.processInfo.environment, uiTesting: UITestingLaunch.current) {
             return NoSessionEffects()
         }
-        // Step 2b returns `LiveSessionEffects.shared` here.
-        return NoSessionEffects()
+        return LiveSessionEffects.shared
     }()
+
+    /// Installs the notification delegate when the effects are live (never in tests, UI-testing mode or
+    /// previews). Called from `WorkoutBuddyApp.init`, so the delegate is set before any notification arrives.
+    static func install() {
+        (current as? LiveSessionEffects)?.installDelegate()
+    }
 
     /// Whether the process must not reach the system: it hosts unit tests, runs in UI-testing mode, or
     /// renders Xcode previews.

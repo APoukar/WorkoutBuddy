@@ -18,8 +18,16 @@ private final class RecordingEffects: SessionEffects {
         hasChangesAtReport.append(context.hasChanges)
     }
 
+    func appBecameActive(_ state: SessionEffectsState) {
+        activeStates.append(state)
+    }
+
     func requestNotificationPermissionIfNeeded() {}
     func notificationAuthorization() async -> NotificationAuthorization { .allowed }
+    func restEndAlertIsCovered(restEndsAt: Date) -> Bool { false }
+
+    /// The states reported through `appBecameActive` (kept apart from `states`, which `SessionLibrary` feeds).
+    private(set) var activeStates: [SessionEffectsState] = []
 
     /// The snapshot of the latest report (`nil` for `.none` or no report).
     var lastSnapshot: SessionSnapshot? {
@@ -305,6 +313,23 @@ struct SessionEffectsTests {
         #expect(s.effects.hasChangesAtReport.last == false)
     }
 
+    @Test func theLibraryNeverSendsTheCameBackMark() throws {
+        // Only the app (launch, scene phase `.active`) reports `appBecameActive`; the library's actions
+        // go through `sessionChanged` and so never remove delivered notifications.
+        let s = try makeSetup()
+        let (session, ids) = try started(s)
+        try s.lib.completeSet(in: session, setID: ids[0], reps: 10, kg: 60, now: t0 + 10)
+        try s.lib.pause(in: session, now: t0 + 20)
+        try s.lib.resume(in: session, now: t0 + 30)
+        try s.lib.skipRest(in: session, now: t0 + 31)
+        try s.lib.skipSet(in: session, setID: ids[1], now: t0 + 32)
+        try s.lib.endEarly(in: session, now: t0 + 40)
+        try s.lib.save(session)
+
+        #expect(!s.effects.states.isEmpty)
+        #expect(s.effects.activeStates.isEmpty)
+    }
+
     // MARK: Names
 
     @Test func namesComeFromTheReferences() throws {
@@ -387,7 +412,9 @@ struct SessionEffectsTests {
     @Test func noSessionEffectsDoesNothingAndAllowsNotifications() async {
         let effects = NoSessionEffects()
         effects.sessionChanged(.none)
+        effects.appBecameActive(.none)
         effects.requestNotificationPermissionIfNeeded()
         #expect(await effects.notificationAuthorization() == .allowed)
+        #expect(!effects.restEndAlertIsCovered(restEndsAt: .now))
     }
 }
