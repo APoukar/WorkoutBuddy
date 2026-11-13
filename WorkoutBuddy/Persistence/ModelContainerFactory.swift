@@ -4,8 +4,12 @@ import SwiftData
 enum ModelContainerFactory {
     /// True when the app process is hosting unit tests.
     static var isRunningTests: Bool {
-        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
-            || ProcessInfo.processInfo.environment["XCTestBundlePath"] != nil
+        isRunningTests(environment: ProcessInfo.processInfo.environment)
+    }
+
+    /// The same check on a given environment, so it can be tested.
+    nonisolated static func isRunningTests(environment: [String: String]) -> Bool {
+        environment["XCTestConfigurationFilePath"] != nil || environment["XCTestBundlePath"] != nil
     }
 
     /// Builds the V1 container. No migration plan until V2.

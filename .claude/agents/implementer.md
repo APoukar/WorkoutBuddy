@@ -19,7 +19,7 @@ You get the plan (inline or as a file path) and the step to implement. If it's u
 ## Implementing
 - Do what the step says, no more. Don't add features, refactor unrelated code, or add abstractions the plan doesn't call for. If you notice something worth changing outside your step, mention it in the report.
 - Data model rules from the spec always apply: sessions copy planned numbers, names are never copied (look them up by reference), workouts and exercises are soft-deleted, lookups by ID must not filter out archived/deleted records, and name uniqueness is case-insensitive among active records only.
-- Deployment target is iOS 18. Any API newer than iOS 18 needs `if #available` with an iOS 18 fallback.
+- Deployment target is still iOS 18. Any API newer than iOS 18 needs `if #available` (the compiler requires it while the target is iOS 18), but no designed iOS 18 fallback: the `else` branch stays minimal (nothing, or the simplest thing that compiles). All testing is on iOS 27 only; raising the target to iOS 27 is a planned task in `FEATURES.md` §7. Run builds and tests on iOS 27 simulators only, never iOS 18.2.
 - Use system SwiftUI components, SF Symbols, semantic colours and Dynamic Type-friendly fonts. Give icon-only buttons accessibility labels.
 - Keep logic that matters (validation, calculations, timer math, state transitions) out of views, in plain types that can be unit tested.
 - Use modern Swift concurrency correctly (`@MainActor`, `Sendable`, `ModelActor` where the plan uses it). Fix concurrency warnings rather than suppressing them.

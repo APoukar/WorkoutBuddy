@@ -11,9 +11,17 @@ import SwiftData
 /// Undo) also do nothing while paused, while a rest is running (Done, Skip Set), or when the set ID they were
 /// given isn't the set they act on right now (a stale screen or a double tap). `finishRest` is not blocked
 /// by a pause: it still clears a rest that expired before the pause.
+///
+/// After every successful save (and never after a rollback) it tells `effects` the new `SessionEffectsState`.
 @MainActor
 struct SessionLibrary {
     let context: ModelContext
+    let effects: any SessionEffects
+
+    init(context: ModelContext, effects: any SessionEffects = SessionEffectsProvider.current) {
+        self.context = context
+        self.effects = effects
+    }
 
     // MARK: Queries
 
@@ -63,6 +71,21 @@ struct SessionLibrary {
             entries: entries)
     }
 
+    /// Exercise names by ID, looked up through the references (names are never copied into a session).
+    func exerciseNames(of session: WorkoutSession) -> [UUID: String] {
+        let pairs = session.orderedExercises.compactMap { row in row.exercise.map { ($0.id, $0.name) } }
+        return Dictionary(pairs, uniquingKeysWith: { first, _ in first })
+    }
+
+    /// What the side effects should match: the session the cover shows (`.none` when there is none, also
+    /// right after Save or Discard), with names looked up through the references now.
+    func effectsState() throws -> SessionEffectsState {
+        guard let session = try activeSession() else { return .none }
+        return .active(
+            sessionID: session.id, snapshot: snapshot(of: session), workoutName: session.workout?.name,
+            exerciseNames: exerciseNames(of: session))
+    }
+
     // MARK: Start
 
     /// Starts a session of the template, copying its planned numbers (names are never copied).
@@ -97,6 +120,7 @@ struct SessionLibrary {
             }
 
             try context.save()
+            reportToEffects()
             return session
         } catch {
             context.rollback()
@@ -351,10 +375,25 @@ struct SessionLibrary {
         if session.endedAt == nil { session.lastActionAt = now }
     }
 
-    /// Runs `body` and saves once; a failed save is rolled back and rethrown.
+    /// Runs `body` and saves once; a failed save is rolled back and rethrown. After a successful save the
+    /// effects are told the new state.
     private func commit(_ body: () -> Void) throws {
         body()
         do { try context.save() } catch { context.rollback(); throw error }
+        reportToEffects()
+    }
+
+    /// Tells the effects the stored state after a save. The action has already succeeded, so if the state
+    /// can't be read the error is only logged and the report is skipped.
+    private func reportToEffects() {
+        let state: SessionEffectsState
+        do {
+            state = try effectsState()
+        } catch {
+            ErrorLogging.log(error, action: "Read session state for effects", category: "session")
+            return
+        }
+        effects.sessionChanged(state)
     }
 
     private func modelSet(id: UUID, in session: WorkoutSession) -> SessionSet? {

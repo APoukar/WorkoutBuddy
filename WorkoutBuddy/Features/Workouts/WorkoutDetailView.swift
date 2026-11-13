@@ -108,8 +108,11 @@ struct WorkoutDetailView: View {
     /// Starts a session. The full-screen session follows from the store (`RootTabView`), so there's nothing
     /// to present here.
     private func start() {
+        let sessions = SessionLibrary(context: context)
         do {
-            try SessionLibrary(context: context).start(workout)
+            try sessions.start(workout)
+            // The first successful Start asks for notification permission (live effects only ask while undetermined).
+            sessions.effects.requestNotificationPermissionIfNeeded()
         } catch SessionError.alreadyActive {
             // A second tap while the session is opening. An alert here would knock the full-screen
             // session away, so it's logged only.

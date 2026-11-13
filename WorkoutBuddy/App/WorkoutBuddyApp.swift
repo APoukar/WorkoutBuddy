@@ -21,6 +21,7 @@ struct WorkoutBuddyApp: App {
             fatalError("WorkoutBuddy could not create its data store: \(error)")
         }
         Self.seed(container)
+        SessionEffectsProvider.install()
         if let launch = UITestingLaunch.current, launch.seedsScenario {
             do {
                 try UITestingScenario.seed(launch.scenario, in: container)

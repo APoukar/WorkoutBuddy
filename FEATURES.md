@@ -122,3 +122,4 @@ Apple Watch app · iPad · iCloud sync / import · HealthKit · interactive Live
 5. History calendar + session detail (F6)
 6. Progress charts + personal records (F7, F8)
 7. Export (F9)
+8. Raise the minimum to iOS 27 (not a feature; planned on its own): set the deployment target of every target to iOS 27.0, including the widget extension, remove the `if #available` checks for older iOS versions, and update §2 and `CLAUDE.md`. Decided 2026-11-12: the app is only for the owner's iPhone, which runs iOS 27; until then, tests run on iOS 27 only and `if #available` branches for older iOS stay minimal.

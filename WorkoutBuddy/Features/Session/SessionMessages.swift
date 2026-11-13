@@ -21,6 +21,8 @@ nonisolated enum SessionMessages {
     static let resumeButton = "Resume"
     static let cancelButton = "Cancel"
     static let backToWorkoutButton = "Back to Workout"
+    /// Title of the notification that fires when a rest ends while the app is in the background.
+    static let restOverNotificationTitle = "Rest Over"
 
     // MARK: Review of earlier sets
 
