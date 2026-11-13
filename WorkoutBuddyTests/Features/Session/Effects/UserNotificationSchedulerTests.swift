@@ -48,6 +48,19 @@ struct UserNotificationSchedulerTests {
         #expect(mapped as? NotificationSchedulingError == .notAllowed)
     }
 
+    @Test func undocumentedSourceNotAuthorizedCodeMapsToTheAppError() {
+        let error = NSError(domain: UNErrorDomain, code: 2003)
+        #expect(UserNotificationScheduler.mapped(error) as? NotificationSchedulingError == .notAllowed)
+    }
+
+    @Test func otherUNErrorDomainCodesPassThrough() {
+        let error = NSError(domain: UNErrorDomain, code: 2004)
+        #expect((UserNotificationScheduler.mapped(error) as NSError).code == 2004)
+        // Code 2003 in another domain isn't the notification error.
+        let foreign = NSError(domain: NSCocoaErrorDomain, code: 2003)
+        #expect(UserNotificationScheduler.mapped(foreign) as? NotificationSchedulingError == nil)
+    }
+
     @Test func otherErrorsAreNotMapped() {
         let other = UserNotificationScheduler.mapped(UNError(.attachmentInvalidURL))
         #expect((other as? UNError)?.code == .attachmentInvalidURL)

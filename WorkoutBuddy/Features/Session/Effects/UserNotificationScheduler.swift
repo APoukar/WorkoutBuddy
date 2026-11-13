@@ -73,9 +73,18 @@ struct UserNotificationScheduler: NotificationScheduling {
         return remaining
     }
 
-    /// `UNError.notificationsNotAllowed` becomes the app-level `.notAllowed`; any other error stays as it is.
+    /// Undocumented `UNErrorDomain` code that `add` fails with when permission is denied or still undetermined
+    /// ("Source is not authorized."). Seen on iOS 27; it isn't a `UNError.Code` case.
+    nonisolated static let sourceNotAuthorizedErrorCode = 2003
+
+    /// `UNError.notificationsNotAllowed` and the undocumented code 2003 become the app-level `.notAllowed`;
+    /// any other error stays as it is.
     nonisolated static func mapped(_ error: Error) -> Error {
         if let unError = error as? UNError, unError.code == .notificationsNotAllowed {
+            return NotificationSchedulingError.notAllowed
+        }
+        let nsError = error as NSError
+        if nsError.domain == UNErrorDomain, nsError.code == sourceNotAuthorizedErrorCode {
             return NotificationSchedulingError.notAllowed
         }
         return error

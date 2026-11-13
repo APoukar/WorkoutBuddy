@@ -12,6 +12,9 @@ private final class RecordingScheduler: NotificationScheduling {
     private(set) var calls: [Call] = []
     var scheduleError: Error?
     var scheduleResult: NotificationScheduleResult = .added
+    var status: NotificationAuthorization = .allowed
+    var requestError: Error?
+    private(set) var authorizationRequests = 0
 
     func schedule(_ request: RestNotificationRequest) async throws -> NotificationScheduleResult {
         calls.append(.schedule)
@@ -20,8 +23,11 @@ private final class RecordingScheduler: NotificationScheduling {
     }
     func cancel() async { calls.append(.cancel) }
     func removeDelivered() async { calls.append(.removeDelivered) }
-    func authorization() async -> NotificationAuthorization { .allowed }
-    func requestAuthorization() async throws {}
+    func authorization() async -> NotificationAuthorization { status }
+    func requestAuthorization() async throws {
+        authorizationRequests += 1
+        if let requestError { throw requestError }
+    }
 }
 
 @MainActor
@@ -134,5 +140,47 @@ struct LiveSessionEffectsTests {
         #expect(scheduler.calls == [.schedule])
         #expect(!effects.restEndAlertIsCovered(restEndsAt: restEndsAt))  // `autoAdvance` plays.
         #expect(!effects.restEndIsExpected)
+    }
+
+    // MARK: Permission
+
+    @Test(arguments: [NotificationAuthorization.allowed, .denied])
+    func permissionIsNotAskedWhenAlreadyDecided(status: NotificationAuthorization) async {
+        let scheduler = RecordingScheduler()
+        scheduler.status = status
+        let effects = LiveSessionEffects(scheduler: scheduler, settings: { settings })
+        effects.requestNotificationPermissionIfNeeded()
+        await effects.waitUntilIdle()
+        #expect(scheduler.authorizationRequests == 0)
+    }
+
+    @Test func permissionIsAskedWhenNotDetermined() async {
+        let scheduler = RecordingScheduler()
+        scheduler.status = .notDetermined
+        let effects = LiveSessionEffects(scheduler: scheduler, settings: { settings })
+        effects.requestNotificationPermissionIfNeeded()
+        await effects.waitUntilIdle()
+        #expect(scheduler.authorizationRequests == 1)
+    }
+
+    @Test func aFailedPermissionRequestIsLoggedNotThrown() async {
+        struct RequestFailed: Error {}
+        let scheduler = RecordingScheduler()
+        scheduler.status = .notDetermined
+        scheduler.requestError = RequestFailed()
+        var logged: [Error] = []
+        let effects = LiveSessionEffects(scheduler: scheduler, settings: { settings }, log: { logged.append($0) })
+        effects.requestNotificationPermissionIfNeeded()
+        await effects.waitUntilIdle()
+        #expect(scheduler.authorizationRequests == 1)
+        #expect(logged.count == 1)
+        #expect(logged.first is RequestFailed)
+    }
+
+    @Test func notificationAuthorizationReportsTheSchedulersStatus() async {
+        let scheduler = RecordingScheduler()
+        scheduler.status = .denied
+        let effects = LiveSessionEffects(scheduler: scheduler, settings: { settings })
+        #expect(await effects.notificationAuthorization() == .denied)
     }
 }

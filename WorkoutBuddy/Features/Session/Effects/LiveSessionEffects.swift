@@ -13,11 +13,17 @@ final class LiveSessionEffects: SessionEffects {
     /// Held strongly: `UNUserNotificationCenter.delegate` is weak.
     private let delegate: RestNotificationDelegate
     private var delegateInstalled = false
+    private let log: (Error) -> Void
+    private var permissionTask: Task<Void, Never>?
 
     init(
         scheduler: any NotificationScheduling = UserNotificationScheduler(),
-        settings: @escaping () -> AppSettings.Values = { AppSettings.current() }
+        settings: @escaping () -> AppSettings.Values = { AppSettings.current() },
+        log: @escaping (Error) -> Void = {
+            ErrorLogging.log($0, action: "Notification permission request", category: "session")
+        }
     ) {
+        self.log = log
         self.scheduler = scheduler
         let coordinator = RestNotificationCoordinator(scheduler: scheduler)
         self.coordinator = coordinator
@@ -41,19 +47,23 @@ final class LiveSessionEffects: SessionEffects {
         coordinator.reconcile(state, settings: settings(), appBecameActive: true)
     }
 
-    /// Returns when everything reported so far has been applied. For tests.
+    /// Returns when everything reported so far has been applied, and a permission request has finished.
+    /// For tests.
     func waitUntilIdle() async {
         await coordinator.waitUntilIdle()
+        await permissionTask?.value
     }
 
+    /// Asks only while the status is `.notDetermined`; a failed request is logged, never thrown.
     func requestNotificationPermissionIfNeeded() {
         let scheduler = scheduler
-        Task {
+        let log = log
+        permissionTask = Task {
             guard await scheduler.authorization() == .notDetermined else { return }
             do {
                 try await scheduler.requestAuthorization()
             } catch {
-                ErrorLogging.log(error, action: "Notification permission request", category: "session")
+                log(error)
             }
         }
     }
