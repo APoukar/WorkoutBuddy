@@ -74,7 +74,8 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
   - `elapsedStart` (`ElapsedTimerInfo.interval.lowerBound`) and `pausedAt`; the widget builds `Text(timerInterval: elapsedStart...Date.distantFuture, pauseTime: pausedAt, countsDown: false, showsHours: true)`.
   - `restStart` / `restEnd` (rest only): `RestTimerInfo.interval`.
   - `frozenRestText` (paused during a rest): `Formatters.rest` of `RestTimerInfo.frozenRemainingSeconds`.
-  - `summaryTitle` + `durationText` (finished): `SessionMessages.summaryTitle` and `SessionMessages.durationText` of the session's `SessionStats`, the summary screen's own texts.
+  - `summaryTitle` + `durationText` + `spokenDurationText` (finished): `SessionMessages.summaryTitle` (ended early or can't be saved → "Workout Ended", like `SessionSummaryContent`) and `SessionMessages.durationText` / `spokenDurationText` of the session's `SessionStats`, the summary screen's own texts.
+  - Only `phase`, `workoutName` and `elapsedStart` are required; the other fields are optional and `nil` where the phase doesn't use them (no set fields once finished). **Paused during a rest** carries no `upNext` and no rest dates: the next set shows through `exerciseName` / `position` / `setLine` (they describe the next set during a rest), and `frozenRestText != nil` tells it apart from a paused set (the user's decision, step 6 review).
   - **Stale date:** `restEndsAt` only while a rest is running and not paused; otherwise `nil` (an update with `nil` makes a stale activity active again).
 - **Phases** (`ContentState.phase`):
   - **Set:** workout name, exercise name, "Exercise 2 of 5 · Set 3 of 4", the set's reps × kg from `prefill` (`SetSummary.line`, Bodyweight for 0 kg), and the elapsed time: `Text(timerInterval:pauseTime:countsDown: false, showsHours: true)` over `ElapsedTimerInfo.interval`.
@@ -257,3 +258,9 @@ The main session only orchestrates. It writes no Swift app or test code. For eve
 **Step 5 code review, verdict "Approve", 2 minor findings, discussed with the user.** The reviewer ran a fresh `build-for-testing`, the Release device build and the step's suites (38/38), and checked the hand-renamed project file (every ID defined and referenced, no old name left).
 1. [Minor] The extension's display name was the template's `WorkoutBuddyWidgets` → **fixed**: "Workout Buddy", like the app.
 2. [Minor] The status paragraph put a step 4b fix "before step 5" after step 5 was done → **fixed**: before step 6.
+
+**Step 6 code review, verdict "Approve with fixes", 3 minor findings and 1 question, discussed with the user.** The texts match the app's own screens for every state traced; 14 tests and the Release build passed. Implementer's deviation, **accepted**: the set fields are optional (`nil` once finished).
+1. [Minor] No spoken duration for VoiceOver on the finished activity → **fixed**: `spokenDurationText`.
+2. [Minor] Untested: an all-skipped workout ("Workout Ended" through `!canSave`) and a rest into a new exercise → **fixed**: two tests (16 in all).
+3. [Minor] `make`'s control flow (a dead `case`, a redundant line) → **fixed**: a top-level `switch`, no behaviour change.
+4. [Question] Should paused-during-a-rest keep `upNext`? → **user's decision: no**; the next set shows through the set fields.

@@ -29,5 +29,6 @@ struct WorkoutLiveActivity: Widget {
 #Preview("Lock Screen", as: .content, using: WorkoutActivityAttributes(sessionID: UUID())) {
     WorkoutLiveActivity()
 } contentStates: {
-    WorkoutActivityAttributes.ContentState(workoutName: "Push Day")
+    WorkoutActivityAttributes.ContentState(
+        phase: .set, workoutName: "Push Day", exerciseName: "Bench Press", elapsedStart: .now)
 }
