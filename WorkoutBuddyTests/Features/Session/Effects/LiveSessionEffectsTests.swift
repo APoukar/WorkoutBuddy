@@ -57,7 +57,7 @@ struct LiveSessionEffectsTests {
 
     @Test func sessionChangedReconcilesWithoutRemovingDelivered() async {
         let scheduler = RecordingScheduler()
-        let effects = LiveSessionEffects(scheduler: scheduler, settings: { settings })
+        let effects = LiveSessionEffects(scheduler: scheduler, activityController: FakeActivityController(), settings: { settings })
         effects.sessionChanged(restingState())
         await effects.waitUntilIdle()
         #expect(scheduler.calls == [.schedule])
@@ -65,7 +65,7 @@ struct LiveSessionEffectsTests {
 
     @Test func appBecameActiveAlsoRemovesDelivered() async {
         let scheduler = RecordingScheduler()
-        let effects = LiveSessionEffects(scheduler: scheduler, settings: { settings })
+        let effects = LiveSessionEffects(scheduler: scheduler, activityController: FakeActivityController(), settings: { settings })
         effects.appBecameActive(restingState())
         await effects.waitUntilIdle()
         #expect(scheduler.calls == [.schedule, .removeDelivered])
@@ -73,7 +73,7 @@ struct LiveSessionEffectsTests {
 
     @Test func appBecameActiveWithoutASessionCancels() async {
         let scheduler = RecordingScheduler()
-        let effects = LiveSessionEffects(scheduler: scheduler, settings: { settings })
+        let effects = LiveSessionEffects(scheduler: scheduler, activityController: FakeActivityController(), settings: { settings })
         effects.appBecameActive(.none)
         await effects.waitUntilIdle()
         #expect(scheduler.calls == [.cancel, .removeDelivered])
@@ -81,7 +81,7 @@ struct LiveSessionEffectsTests {
 
     @Test func theRestEndIsCoveredAfterASuccessfulSchedule() async {
         let scheduler = RecordingScheduler()
-        let effects = LiveSessionEffects(scheduler: scheduler, settings: { settings })
+        let effects = LiveSessionEffects(scheduler: scheduler, activityController: FakeActivityController(), settings: { settings })
         let state = restingState()
         guard case .active(_, let snapshot, _, _) = state, let restEndsAt = snapshot.restEndsAt else {
             Issue.record("Expected a resting state")
@@ -98,7 +98,7 @@ struct LiveSessionEffectsTests {
     @Test func theRestEndIsNotCoveredWhenSchedulingIsNotAllowed() async {
         let scheduler = RecordingScheduler()
         scheduler.scheduleError = NotificationSchedulingError.notAllowed
-        let effects = LiveSessionEffects(scheduler: scheduler, settings: { settings })
+        let effects = LiveSessionEffects(scheduler: scheduler, activityController: FakeActivityController(), settings: { settings })
         let state = restingState()
         guard case .active(_, let snapshot, _, _) = state, let restEndsAt = snapshot.restEndsAt else {
             Issue.record("Expected a resting state")
@@ -112,7 +112,7 @@ struct LiveSessionEffectsTests {
 
     @Test func aRestEndIsExpectedWhileACoverExistsAndNotAfterAPause() async {
         let scheduler = RecordingScheduler()
-        let effects = LiveSessionEffects(scheduler: scheduler, settings: { settings })
+        let effects = LiveSessionEffects(scheduler: scheduler, activityController: FakeActivityController(), settings: { settings })
         #expect(!effects.restEndIsExpected)
 
         effects.sessionChanged(restingState())
@@ -129,7 +129,7 @@ struct LiveSessionEffectsTests {
         // The real scheduler returns `.tooLate` for under a second left (see `triggerInterval`).
         let scheduler = RecordingScheduler()
         scheduler.scheduleResult = .tooLate
-        let effects = LiveSessionEffects(scheduler: scheduler, settings: { settings })
+        let effects = LiveSessionEffects(scheduler: scheduler, activityController: FakeActivityController(), settings: { settings })
         let state = restingState(restLeft: 0.55)
         guard case .active(_, let snapshot, _, _) = state, let restEndsAt = snapshot.restEndsAt else {
             Issue.record("Expected a resting state")
@@ -148,7 +148,7 @@ struct LiveSessionEffectsTests {
     func permissionIsNotAskedWhenAlreadyDecided(status: NotificationAuthorization) async {
         let scheduler = RecordingScheduler()
         scheduler.status = status
-        let effects = LiveSessionEffects(scheduler: scheduler, settings: { settings })
+        let effects = LiveSessionEffects(scheduler: scheduler, activityController: FakeActivityController(), settings: { settings })
         effects.requestNotificationPermissionIfNeeded()
         await effects.waitUntilIdle()
         #expect(scheduler.authorizationRequests == 0)
@@ -157,7 +157,7 @@ struct LiveSessionEffectsTests {
     @Test func permissionIsAskedWhenNotDetermined() async {
         let scheduler = RecordingScheduler()
         scheduler.status = .notDetermined
-        let effects = LiveSessionEffects(scheduler: scheduler, settings: { settings })
+        let effects = LiveSessionEffects(scheduler: scheduler, activityController: FakeActivityController(), settings: { settings })
         effects.requestNotificationPermissionIfNeeded()
         await effects.waitUntilIdle()
         #expect(scheduler.authorizationRequests == 1)
@@ -169,7 +169,7 @@ struct LiveSessionEffectsTests {
         scheduler.status = .notDetermined
         scheduler.requestError = RequestFailed()
         var logged: [Error] = []
-        let effects = LiveSessionEffects(scheduler: scheduler, settings: { settings }, log: { logged.append($0) })
+        let effects = LiveSessionEffects(scheduler: scheduler, activityController: FakeActivityController(), settings: { settings }, log: { logged.append($0) })
         effects.requestNotificationPermissionIfNeeded()
         await effects.waitUntilIdle()
         #expect(scheduler.authorizationRequests == 1)
@@ -180,7 +180,39 @@ struct LiveSessionEffectsTests {
     @Test func notificationAuthorizationReportsTheSchedulersStatus() async {
         let scheduler = RecordingScheduler()
         scheduler.status = .denied
-        let effects = LiveSessionEffects(scheduler: scheduler, settings: { settings })
+        let effects = LiveSessionEffects(scheduler: scheduler, activityController: FakeActivityController(), settings: { settings })
         #expect(await effects.notificationAuthorization() == .denied)
+    }
+
+    // MARK: Live Activity
+
+    @Test func eachStateReachesBothCoordinators() async {
+        let scheduler = RecordingScheduler()
+        let controller = FakeActivityController()
+        let effects = LiveSessionEffects(scheduler: scheduler, activityController: controller, settings: { settings })
+        let state = restingState()
+        guard case .active(let sessionID, _, _, _) = state else {
+            Issue.record("Expected an active state")
+            return
+        }
+
+        effects.sessionChanged(state)
+        await effects.waitUntilIdle()
+        #expect(scheduler.calls == [.schedule])
+        #expect(controller.calls == [.request(sessionID)])
+
+        effects.appBecameActive(.none)
+        await effects.waitUntilIdle()
+        #expect(scheduler.calls == [.schedule, .cancel, .removeDelivered])
+        #expect(controller.calls == [.request(sessionID), .end("A1")])
+    }
+
+    @Test func appBecameActiveReconcilesTheActivityToo() async {
+        let controller = FakeActivityController()
+        let effects = LiveSessionEffects(
+            scheduler: RecordingScheduler(), activityController: controller, settings: { settings })
+        effects.appBecameActive(restingState())
+        await effects.waitUntilIdle()
+        #expect(controller.liveEntries.count == 1)
     }
 }
