@@ -2,33 +2,34 @@ import ActivityKit
 import SwiftUI
 import WidgetKit
 
-/// The workout's Live Activity on the Lock Screen and in the Dynamic Island.
-///
-/// A placeholder for now: phase 4, step 8 adds the real views.
+/// The workout's Live Activity on the Lock Screen and in the Dynamic Island. The views are in
+/// `WorkoutActivityViews.swift`.
 struct WorkoutLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: WorkoutActivityAttributes.self) { context in
-            Text(context.state.workoutName)
+            WorkoutActivityContentView(
+                state: context.state, phase: context.state.displayPhase(isStale: context.isStale))
                 .padding()
         } dynamicIsland: { context in
-            DynamicIsland {
+            let phase = context.state.displayPhase(isStale: context.isStale)
+            return DynamicIsland {
+                DynamicIslandExpandedRegion(.leading) {
+                    WorkoutActivityExpandedLeading(state: context.state, phase: phase)
+                }
+                DynamicIslandExpandedRegion(.trailing) {
+                    WorkoutActivityExpandedTrailing(state: context.state, phase: phase)
+                }
                 DynamicIslandExpandedRegion(.bottom) {
-                    Text(context.state.workoutName)
+                    WorkoutActivityExpandedBottom(state: context.state, phase: phase)
                 }
             } compactLeading: {
-                Image(systemName: "dumbbell.fill")
+                Image(systemName: phase.symbolName)
+                    .accessibilityHidden(true)
             } compactTrailing: {
-                EmptyView()
+                WorkoutActivityCompactTrailing(state: context.state, phase: phase)
             } minimal: {
-                Image(systemName: "dumbbell.fill")
+                WorkoutActivityMinimal(state: context.state, phase: phase)
             }
         }
     }
-}
-
-#Preview("Lock Screen", as: .content, using: WorkoutActivityAttributes(sessionID: UUID())) {
-    WorkoutLiveActivity()
-} contentStates: {
-    WorkoutActivityAttributes.ContentState(
-        phase: .set, workoutName: "Push Day", exerciseName: "Bench Press", elapsedStart: .now)
 }
