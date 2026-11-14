@@ -77,17 +77,18 @@ extension XCUIElement {
         return waitUntil(predicate, timeout: timeout)
     }
 
-    /// Waits for the element to settle (see `waitUntilSettled`); if that times out, waits up to 3 s (or
-    /// `timeout` if shorter, so a short caller timeout stays short) for a single read to find the element
-    /// present on screen, using the same screen frame as the settle wait. Returns whether the element is
-    /// present on screen afterwards (settled or not).
+    /// Waits for the element to settle (see `waitUntilSettled`); if that times out, waits up to another
+    /// `timeout` (so a short caller timeout stays short) for a single read to find the element present on
+    /// screen, using the same screen frame as the settle wait. The fallback window is not capped at a few
+    /// seconds because on CI one snapshot can take more than 3 s, and a shorter window produced no read at
+    /// all. Returns whether the element is present on screen afterwards (settled or not).
     func waitUntilSettledOrPresent(timeout: TimeInterval = defaultTimeout) -> Bool {
         let screen = XCUIApplication().frame
         if waitUntilSettled(screen: screen, timeout: timeout) { return true }
         let present = NSPredicate { evaluated, _ in
             MainActor.assumeIsolated { (evaluated as? XCUIElement)?.frameOnScreen(screen) != nil }
         }
-        return waitUntil(present, timeout: min(3, timeout))
+        return waitUntil(present, timeout: timeout)
     }
 }
 
