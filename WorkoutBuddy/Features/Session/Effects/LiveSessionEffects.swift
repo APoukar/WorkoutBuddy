@@ -9,6 +9,7 @@ final class LiveSessionEffects: SessionEffects {
 
     private let scheduler: any NotificationScheduling
     private let coordinator: RestNotificationCoordinator
+    private let activityCoordinator: LiveActivityCoordinator
     private let settings: () -> AppSettings.Values
     /// Held strongly: `UNUserNotificationCenter.delegate` is weak.
     private let delegate: RestNotificationDelegate
@@ -18,6 +19,7 @@ final class LiveSessionEffects: SessionEffects {
 
     init(
         scheduler: any NotificationScheduling = UserNotificationScheduler(),
+        activityController: any LiveActivityControlling = ActivityKitController(),
         settings: @escaping () -> AppSettings.Values = { AppSettings.current() },
         log: @escaping (Error) -> Void = {
             ErrorLogging.log($0, action: "Notification permission request", category: "session")
@@ -27,6 +29,7 @@ final class LiveSessionEffects: SessionEffects {
         self.scheduler = scheduler
         let coordinator = RestNotificationCoordinator(scheduler: scheduler)
         self.coordinator = coordinator
+        self.activityCoordinator = LiveActivityCoordinator(controller: activityController)
         self.delegate = RestNotificationDelegate(restEndIsExpected: { coordinator.isExpectingRestEnd })
         self.settings = settings
     }
@@ -41,16 +44,19 @@ final class LiveSessionEffects: SessionEffects {
 
     func sessionChanged(_ state: SessionEffectsState) {
         coordinator.reconcile(state, settings: settings())
+        activityCoordinator.reconcile(state)
     }
 
     func appBecameActive(_ state: SessionEffectsState) {
         coordinator.reconcile(state, settings: settings(), appBecameActive: true)
+        activityCoordinator.reconcile(state)
     }
 
     /// Returns when everything reported so far has been applied, and a permission request has finished.
     /// For tests.
     func waitUntilIdle() async {
         await coordinator.waitUntilIdle()
+        await activityCoordinator.waitUntilIdle()
         await permissionTask?.value
     }
 
