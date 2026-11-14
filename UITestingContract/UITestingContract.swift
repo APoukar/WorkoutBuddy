@@ -28,6 +28,9 @@ nonisolated enum UITestingContract {
         static let nothingDone = "nothingDone"
         /// The templates and a finished "Long Rests" session with all sets done, waiting for Save.
         static let onSummary = "onSummary"
+        /// The templates and saved "Long Rests" sessions: two today, and one on the 15th of the previous month
+        /// (ended early: a changed set, a skipped set, a set never reached).
+        static let history = "history"
     }
 
     /// The seeded templates (every scenario except `empty`).

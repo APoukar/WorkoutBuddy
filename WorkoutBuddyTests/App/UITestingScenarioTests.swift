@@ -137,6 +137,80 @@ struct UITestingScenarioTests {
         #expect(stats.notPerformedCount == 0)
     }
 
+    // MARK: History
+
+    private func finished(_ tc: TestContainer) throws -> [WorkoutSession] {
+        try HistoryLibrary(context: tc.context).finishedSessions()
+    }
+
+    private func historyDays(_ sessions: [WorkoutSession], calendar: Calendar = .current) -> [HistoryDay] {
+        sessions.map { HistoryDay($0.startedAt, calendar: calendar) }
+    }
+
+    @Test func historySeedsThreeSavedSessionsAndNothingInProgress() throws {
+        let tc = try make(.history)
+        #expect(try workouts(tc).count == 2)
+        let all = try sessions(tc)
+        #expect(all.count == 3)
+        #expect(all.allSatisfy { $0.workout?.name == "Long Rests" })
+        #expect(try SessionLibrary(context: tc.context).activeSession() == nil)
+        let saved = try finished(tc)
+        #expect(saved.count == 3)
+        #expect(saved.map(\.status) == [.endedEarly, .completed, .completed])
+    }
+
+    @Test func historyDays() throws {
+        let tc = try make(.history)
+        let calendar = Calendar.current
+        let saved = try finished(tc)
+        let days = historyDays(saved)
+        let today = HistoryDay(now, calendar: calendar)
+        #expect(days[1] == today)
+        #expect(days[2] == today)
+        #expect(days[0].day == 15)
+        let thisMonth = calendar.dateComponents([.year, .month], from: now)
+        let previous = calendar.date(byAdding: .month, value: -1, to: calendar.date(from: thisMonth)!)!
+        let previousParts = calendar.dateComponents([.year, .month], from: previous)
+        #expect(days[0].year == previousParts.year)
+        #expect(days[0].month == previousParts.month)
+    }
+
+    @Test func historyEndedEarlySession() throws {
+        let tc = try make(.history)
+        let session = try #require(try finished(tc).first)
+        let snapshot = SessionLibrary(context: tc.context).snapshot(of: session)
+        #expect(session.status == .endedEarly)
+        #expect(snapshot.entries.map(\.status) == [.done, .skipped, .notPerformed])
+        #expect(snapshot.entries[0].actualKg == 65)
+        #expect(snapshot.entries[0].planned.kg == 60)
+    }
+
+    @Test func historyTodaySessionsAreDoneAsPlanned() throws {
+        let tc = try make(.history)
+        let library = SessionLibrary(context: tc.context)
+        for session in try finished(tc).dropFirst() {
+            let stats = SessionStats(library.snapshot(of: session), now: now)
+            #expect(stats.volume == 1420)
+            #expect(stats.doneCount == 3)
+        }
+    }
+
+    /// Right after midnight the anchor is the start of the day, and every session must still be on today.
+    @Test func historyTodaySessionsStayOnTodayJustAfterMidnight() throws {
+        let calendar = Calendar.current
+        let justAfterMidnight = calendar.startOfDay(for: now).addingTimeInterval(5)
+        let tc = try TestContainer()
+        try ExerciseSeed.seedIfNeeded(in: tc.context)
+        try UITestingScenario.seed(.history, in: tc.container, now: justAfterMidnight)
+        let saved = try finished(tc)
+        let today = HistoryDay(justAfterMidnight, calendar: calendar)
+        let days = historyDays(saved)
+        #expect(days.count == 3)
+        #expect(days[1] == today)
+        #expect(days[2] == today)
+        #expect(days[0] < today)
+    }
+
     // MARK: Keep data
 
     @Test func keepDataLaunchSeedsNothing() throws {

@@ -54,7 +54,7 @@ struct RootTabView: View {
                 WorkoutListView()
             }
             Tab("History", systemImage: "calendar") {
-                placeholder("History", systemImage: "calendar")
+                HistoryView()
             }
             Tab("Progress", systemImage: "chart.line.uptrend.xyaxis") {
                 placeholder("Progress", systemImage: "chart.line.uptrend.xyaxis")

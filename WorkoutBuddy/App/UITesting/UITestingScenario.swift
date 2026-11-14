@@ -83,6 +83,46 @@ enum UITestingScenario {
             try sessions.completeSet(in: session, setID: sets[1], reps: 8, kg: 62.5, now: at(400))
             try sessions.skipRest(in: session, now: at(395))
             try sessions.completeSet(in: session, setID: sets[2], reps: 8, kg: 40, now: at(300))
+        case .history:
+            try seedHistory(longRests, sessions: sessions, now: now)
+        }
+    }
+
+    /// Saved "Long Rests" sessions: two today and one on the 15th of the previous month.
+    ///
+    /// Midnight-safe: today's sessions are anchored at `max(start of today, now - 2 h)` plus fixed offsets, so
+    /// they stay on today even right after midnight. Their actions may then come after `now`; `SessionLibrary`
+    /// accepts any `now:`. The older one is on the previous month's 15th (that month always has one), in the
+    /// evening, so it is always in the past.
+    private static func seedHistory(_ workout: Workout, sessions: SessionLibrary, now: Date) throws {
+        let calendar = Calendar.current
+        let anchor = max(calendar.startOfDay(for: now), now.addingTimeInterval(-2 * 3600))
+
+        // The 15th of the previous month: set 1 done with a changed kg, set 2 skipped, set 3 never reached.
+        let monthStart = calendar.dateInterval(of: .month, for: now)?.start ?? now
+        let previousMonth = calendar.date(byAdding: .month, value: -1, to: monthStart) ?? monthStart
+        let fifteenth = calendar.date(byAdding: .day, value: 14, to: previousMonth) ?? previousMonth
+        let old = calendar.date(bySettingHour: 18, minute: 0, second: 0, of: fifteenth) ?? fifteenth
+        func fromOld(_ seconds: TimeInterval) -> Date { old.addingTimeInterval(seconds) }
+        let early = try sessions.start(workout, now: old)
+        var sets = sessions.snapshot(of: early).entries.map(\.id)
+        try sessions.completeSet(in: early, setID: sets[0], reps: 10, kg: 65, now: fromOld(120))
+        try sessions.skipRest(in: early, now: fromOld(125))
+        try sessions.skipSet(in: early, setID: sets[1], now: fromOld(200))
+        try sessions.endEarly(in: early, now: fromOld(260))
+        try sessions.save(early)
+
+        // Two today, all sets done as planned (volume 1,420 kg): one at the anchor, one half an hour later.
+        for offset: TimeInterval in [0, 1800] {
+            func at(_ seconds: TimeInterval) -> Date { anchor.addingTimeInterval(offset + seconds) }
+            let session = try sessions.start(workout, now: at(0))
+            sets = sessions.snapshot(of: session).entries.map(\.id)
+            try sessions.completeSet(in: session, setID: sets[0], reps: 10, kg: 60, now: at(100))
+            try sessions.skipRest(in: session, now: at(105))
+            try sessions.completeSet(in: session, setID: sets[1], reps: 8, kg: 62.5, now: at(200))
+            try sessions.skipRest(in: session, now: at(205))
+            try sessions.completeSet(in: session, setID: sets[2], reps: 8, kg: 40, now: at(300))
+            try sessions.save(session)
         }
     }
 }

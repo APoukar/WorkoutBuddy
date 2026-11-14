@@ -105,7 +105,7 @@ The main session only orchestrates and writes no Swift app or test code. Per ste
 ## Hooks left for later phases
 - **Phase 6:** PR badges on the detail rows (`SessionDetailContent` gets per-set record flags); tapping an exercise section opens its progress screen (the section keeps the exercise ID); `HistoryLibrary.delete` recalculates records.
 - **Phase 7:** nothing new is stored.
-- **UI tidying session:** the calendar's and the detail's look.
+- **UI tidying session:** the calendar's and the detail's look; the empty-history note starts below the fold on small iPhones (maybe above the calendar).
 
 ## Verification
 - Each step: the build, the step's unit suites on iPhone 17 / iOS 27.0, the Release build where the step says so, and the `code-reviewer` review (with its runtime check in step 4b). Full unit and UI suites on GitHub CI with the phase PR.
@@ -146,3 +146,7 @@ The main session only orchestrates and writes no Swift app or test code. Per ste
 **Step 4a code review, verdict "Approve with fixes", 1 question and 1 minor finding, settled by the main session.** Runtime check on iPhone 17e / iOS 27 (scratch harness): dots on the right days; days without a workout disabled; re-tapping works; adding and removing a day while alive updates the dot and tappability; the next month isn't reachable, also on the 31st; Today works; the calendar always reserves six rows (498 pt, 585 pt at accessibility3, no clipping). No new tests at first (glue only).
 1. [Question] On iOS 27 a non-selectable today is drawn plain grey, so "today highlighted" (F6) was lost on days without a workout → **main session's choice, to confirm with the user**: today is always selectable (`HistoryRules.isSelectable`, tested); a tap on today without a workout is ignored. Cost: VoiceOver reads an empty today as enabled. Alternatives: accept the grey today, or a separate decoration for today.
 2. [Minor] A changed calendar or time zone wasn't applied → **fixed**: `calendar` and `timeZone` set again when `today` or the calendar changes, plus `updateSelectableDates()` (implementer's addition, accepted).
+
+**Step 4b code review, verdict "Approve", 1 question and 1 minor note, settled by the main session.** Release build clean; 27 scenario and launch tests passed. Runtime check on iPhone 17e / iOS 27 with the `history` scenario: dots on today and the 15th of the previous month only; the 15th opens the detail ("Ended early", "10 × 65 kg" / "Planned 10 × 60 kg", "Skipped", "Not performed"); today opens the day list oldest first; deleting one of two pops to the list, deleting the last pops the list too; an emptied past day loses its dot and can't be tapped; an empty today stays enabled and does nothing; saving a workout while the tab is alive adds a tappable day; "Last done" moved from today to the previous month after the deletes; `onSummary` → Save → History → today shows "1,420 kilograms"; Today returns from two months back; the empty note shows with `templates`.
+1. [Question] Whether `UICalendarView` moves its today ring at midnight can't be checked in the simulator → **fixed**: `.id(today)` on the calendar.
+2. [Minor] On iPhone 17e the empty note starts below the fold (the calendar always reserves six rows) → **left for the UI tidying session** (see Hooks).
