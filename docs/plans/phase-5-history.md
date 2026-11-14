@@ -132,3 +132,7 @@ The main session only orchestrates and writes no Swift app or test code. Per ste
 **Step 1 code review, verdict "Approve", 2 minor findings, settled by the main session.** 23 tests passed. Implementer's deviations, **accepted**: `path(afterDeleting:from:remaining:calendar:)` takes the path, the remaining entries (it ignores the deleted one itself) and a calendar; `destination(for:sessions:)` takes the day's sessions; `HistoryDay` is also `Comparable`.
 1. [Minor] No test caught removing the "ignore the deleted session in `remaining`" filter → **fixed**: the last-session test passes the deleted session in `remaining`.
 2. [Minor] `session(id:)` swallowed a fetch error → **fixed**: logged, category `"history"`.
+
+**Step 2 code review, verdict "Approve", 2 minor findings, settled by the main session.** 60 tests passed in the four touched suites; "Last done" unchanged. Small additions beyond the plan (tab title, Today, Delete and Cancel texts; whitespace-only names use the fallback) **accepted**.
+1. [Minor] The day-list row texts took a raw duration, which could include pauses → **fixed**: they take `SessionStats` and use `SessionMessages.durationText`.
+2. [Minor] A `.pending` set in a saved session untested → **fixed**: reads "Not performed".

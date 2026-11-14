@@ -42,9 +42,7 @@ nonisolated enum WorkoutListRules {
     ) -> WorkoutRowSubtitle {
         let performedText: String
         if let lastPerformed {
-            let style = Date.FormatStyle(
-                date: .abbreviated, time: .omitted, locale: locale, calendar: locale.calendar, timeZone: timeZone)
-            performedText = "Last done \(lastPerformed.formatted(style))"
+            performedText = "Last done \(Formatters.shortDate(lastPerformed, locale: locale, timeZone: timeZone))"
         } else {
             performedText = "Not done yet"
         }
