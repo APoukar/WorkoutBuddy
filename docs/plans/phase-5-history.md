@@ -128,3 +128,7 @@ The main session only orchestrates and writes no Swift app or test code. Per ste
 12. [Minor] Step 4 too big → **accepted**: steps 4a and 4b.
 13. [Minor] "Last done" after a delete → **accepted** into the step 4b runtime check.
 14. [Question] Alert wording, button label → **main session's choice**: the message names the date; `Label("Delete", systemImage: "trash")` with a UI-test identifier.
+
+**Step 1 code review, verdict "Approve", 2 minor findings, settled by the main session.** 23 tests passed. Implementer's deviations, **accepted**: `path(afterDeleting:from:remaining:calendar:)` takes the path, the remaining entries (it ignores the deleted one itself) and a calendar; `destination(for:sessions:)` takes the day's sessions; `HistoryDay` is also `Comparable`.
+1. [Minor] No test caught removing the "ignore the deleted session in `remaining`" filter → **fixed**: the last-session test passes the deleted session in `remaining`.
+2. [Minor] `session(id:)` swallowed a fetch error → **fixed**: logged, category `"history"`.
