@@ -99,9 +99,7 @@ enum UITestingScenario {
         let anchor = max(calendar.startOfDay(for: now), now.addingTimeInterval(-2 * 3600))
 
         // The 15th of the previous month: set 1 done with a changed kg, set 2 skipped, set 3 never reached.
-        let monthStart = calendar.dateInterval(of: .month, for: now)?.start ?? now
-        let previousMonth = calendar.date(byAdding: .month, value: -1, to: monthStart) ?? monthStart
-        let fifteenth = calendar.date(byAdding: .day, value: 14, to: previousMonth) ?? previousMonth
+        let fifteenth = UITestingContract.History.previousMonthFifteenth(now: now, calendar: calendar)
         let old = calendar.date(bySettingHour: 18, minute: 0, second: 0, of: fifteenth) ?? fifteenth
         func fromOld(_ seconds: TimeInterval) -> Date { old.addingTimeInterval(seconds) }
         let early = try sessions.start(workout, now: old)
