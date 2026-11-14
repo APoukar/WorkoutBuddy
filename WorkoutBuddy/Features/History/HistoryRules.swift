@@ -91,6 +91,12 @@ nonisolated enum HistoryRules {
         return result
     }
 
+    /// Whether a calendar day can be selected: days with a workout, and today (iOS draws a non-selectable today
+    /// in plain grey, which would lose the "today highlighted" look; tapping an empty today does nothing).
+    static func isSelectable(_ day: HistoryDay, days: Set<HistoryDay>, today: HistoryDay) -> Bool {
+        days.contains(day) || day == today
+    }
+
     /// The days whose decoration or selectability changed: in exactly one of the two sets. Sorted.
     static func daysToReload(old: Set<HistoryDay>, new: Set<HistoryDay>) -> [HistoryDay] {
         old.symmetricDifference(new).sorted()

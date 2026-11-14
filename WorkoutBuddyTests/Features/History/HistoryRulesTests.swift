@@ -105,6 +105,16 @@ struct HistoryRulesTests {
         #expect(HistoryRules.path(afterDeleting: UUID(), from: path, remaining: [], calendar: cal) == path)
     }
 
+    @Test func todayIsSelectableEvenWithoutAWorkout() {
+        let d1 = HistoryDay(year: 2026, month: 11, day: 10)
+        let today = HistoryDay(year: 2026, month: 11, day: 14)
+        let other = HistoryDay(year: 2026, month: 11, day: 12)
+        #expect(HistoryRules.isSelectable(d1, days: [d1], today: today))
+        #expect(HistoryRules.isSelectable(today, days: [d1], today: today))
+        #expect(HistoryRules.isSelectable(today, days: [], today: today))
+        #expect(!HistoryRules.isSelectable(other, days: [d1], today: today))
+    }
+
     @Test func daysToReloadIsTheSymmetricDifference() {
         let d1 = HistoryDay(year: 2026, month: 11, day: 1)
         let d2 = HistoryDay(year: 2026, month: 11, day: 2)
