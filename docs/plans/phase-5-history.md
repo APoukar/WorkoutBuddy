@@ -136,3 +136,8 @@ The main session only orchestrates and writes no Swift app or test code. Per ste
 **Step 2 code review, verdict "Approve", 2 minor findings, settled by the main session.** 60 tests passed in the four touched suites; "Last done" unchanged. Small additions beyond the plan (tab title, Today, Delete and Cancel texts; whitespace-only names use the fallback) **accepted**.
 1. [Minor] The day-list row texts took a raw duration, which could include pauses → **fixed**: they take `SessionStats` and use `SessionMessages.durationText`.
 2. [Minor] A `.pending` set in a saved session untested → **fixed**: reads "Not performed".
+
+**Step 3 code review, verdict "Approve", 3 minor findings, settled by the main session.** Release build clean. Runtime check on iPhone 17e / iOS 27 (a scratch copy showing the preview data): the layout for completed, ended-early, Bodyweight with a deleted template and accessibility3; names of the archived exercise and the deleted template shown; Delete → alert naming the date → Cancel keeps it, Delete pops and removes it. Note for step 6: the toolbar button's identifier may sit on SwiftUI's element, not the `UIBarButtonItem`; the probe checks it. Implementer's deviations, **accepted**: `HistoryPreviewDataTests` (the preview data stops the app on failure and depends on the start/save/archive order); the Legs session sits on day −4 because `WorkoutPreviewData` already has one on day −3.
+1. [Minor] A wrong test comment → **fixed**.
+2. [Minor] `HistoryPreviewData.make(now:)` only partly used `now` → **fixed**: parameter dropped.
+3. [Minor] Delete on an in-progress session would still pop → **fixed**: `onDeleted` only after a real delete or when the session is already gone.

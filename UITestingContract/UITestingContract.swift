@@ -64,6 +64,8 @@ nonisolated enum UITestingContract {
         /// The large reps and kg controls, one adjustable element each (on the set screen and the review).
         static let repsControl = "session.reps"
         static let kgControl = "session.kg"
+        /// The session detail's Delete toolbar button (the confirmation alert has a button with the same label).
+        static let historyDeleteSession = "history.detail.delete"
     }
 
     /// The spoken forms XCUITest sees as labels and values (it matches what VoiceOver gets, not the visible text).
