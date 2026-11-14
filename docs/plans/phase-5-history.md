@@ -7,7 +7,7 @@
 
 **Overnight run (the user's instruction, 2026-11-14):** the user asked for the phase to be built autonomously while they sleep. The main session settles the architect's and the code reviewer's findings itself, logs every decision under "Review decisions made without the user", defers anything that needs the user (step 5's manual check, pushing, the PR) and reports in the morning.
 
-**Status (2026-11-14, end of the overnight run):** plan f773764; steps 1 (b1e44ec), 2 (cc62a24), 3 (6e25b71), 4a (9592743), 4b (6aa1f8d) and 6 (61c7bde) committed, each reviewed, with every finding settled by the main session (log at the end). Step 7: `FEATURES.md` F6 updated. **Waiting for the user:** step 5 (the manual check, with `-uiTesting YES -uiTestingScenario history` for seeded data); pushing, the PR (after phase 4's PR APoukar/WorkoutBuddy#6 merges, rebase or merge `main` in) and CI with the full unit and UI suites, which never ran locally. The final Release build of the branch passed (main session, after step 7).
+**Status (2026-11-14):** plan f773764; steps 1 (b1e44ec), 2 (cc62a24), 3 (6e25b71), 4a (9592743), 4b (6aa1f8d) and 6 (61c7bde) committed, each reviewed, with every finding settled by the main session (log at the end). Step 7: `FEATURES.md` F6 updated; the final Release build passed. The user confirmed that today stays always tappable, and did the step 5 manual check on the iPhone 17 / iOS 27 simulator with the `history` scenario: everything works, no fixes. Pushed as PR APoukar/WorkoutBuddy#7 (phase 4's #6 merged unchanged, so nothing to merge in); CI runs the full unit and UI suites.
 
 ## Parts and sessions
 Seven steps is too much for one session once review rounds are counted (phase 4 needed five rounds on one step), and the UI tests are slow and flaky on this Mac. So, like phase 4, two parts, one after the other:
@@ -87,7 +87,7 @@ The main session only orchestrates and writes no Swift app or test code. Per ste
 - Run the Release build too.
 - **Runtime check by the code reviewer** on iPhone 17e / iOS 27 (launch with `-uiTesting YES -uiTestingScenario history`, never the user's iPhone 17 simulator): dots on the right days, previous month by swipe, a one-session day opens the detail, a two-session day opens the list, delete pops back and the emptied day's dot goes away **and the day can't be tapped any more**, saving a workout adds a dot while the tab is alive **and the new day can be tapped**, the Workouts tab's "Last done" is updated after a delete (finding 13).
 
-**Step 5 — Part A manual check (user)** — iPhone 17 / iOS 27 simulator, launched with the `history` scenario for the seeded data (and normally for the empty and save checks); the list under Verification. Anything found becomes a step 5b fix. (Overnight: deferred to the morning; part B goes ahead.)
+**Step 5 — Part A manual check (user)** — iPhone 17 / iOS 27 simulator, launched with the `history` scenario for the seeded data (and normally for the empty and save checks); the list under Verification. Anything found becomes a step 5b fix. (Overnight: deferred to the morning; part B goes ahead.) **Done 2026-11-14 by the user: works, no fixes.**
 
 ### Part B — UI tests and wrap-up (fresh session)
 
