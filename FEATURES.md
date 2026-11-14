@@ -57,10 +57,13 @@ A personal iPhone app for planning gym workouts, running them set by set with gu
 ### F4 — Lock Screen & background
 - **Live Activity** (Lock Screen + Dynamic Island) while a session runs:
   - During a set: exercise, set number, reps × kg, elapsed time.
-  - During rest: a live countdown, rendered by the system so it keeps running while the app is suspended.
-- A **local notification** with sound and vibration fires when rest ends. It is scheduled when rest starts and cancelled on skip rest, pause or end.
+  - During rest: a live countdown with a progress bar and the up-next set, rendered by the system so it keeps running while the app is suspended.
+  - Paused: "Paused", the elapsed time frozen, and the rest left if paused during a rest. Finished, waiting for Save: the summary title and the duration.
+  - When a rest ends in the background, the rest-end notification wakes the app and the activity shows the next set a few seconds after 0. If the app can't update it, the activity shows **"Rest over"** with the next set shortly after 0.
+  - Save or Discard removes it. An activity swiped away stays away until the app is launched again. Tapping it opens the app.
+- A **local notification** ("Rest Over" with the up-next set) fires when rest ends. It is scheduled when rest starts and cancelled on skip rest, undo, pause, end or discard (rescheduled on resume). With **Sound** on it plays the rest-end chime; with only **Haptics** on it plays a silent sound so the phone vibrates; with both off it's a silent banner. When the app is open at rest end, the in-app alert plays instead of the banner, so there is always exactly one alert.
 - When you come back to the app after rest has ended, the next set's screen is already showing.
-- Notification permission is requested the first time you start a workout.
+- Notification permission is requested the first time you start a workout. If it's denied, the in-app alert and the Live Activity still work, and Settings shows "Notifications are off" with a button to the system settings.
 
 ### F5 — Workout summary
 - Shown when the last set finishes or the workout ends early: total duration (excluding pauses), sets completed / skipped, total volume (Σ reps × kg) and **new personal records** hit in this session.
