@@ -227,4 +227,29 @@ struct FormattersTests {
         #expect(Formatters.spokenVolume(0, locale: us) == "0 kilograms")
         #expect(Formatters.spokenVolume(157.5, locale: enCZ) == "157,5 kilograms")
     }
+
+    // MARK: Dates and times
+
+    private var nov14Evening: Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Prague") ?? .gmt
+        return calendar.date(from: DateComponents(year: 2026, month: 11, day: 14, hour: 18, minute: 30)) ?? .now
+    }
+
+    @Test func dateTextsFollowLocaleAndTimeZone() {
+        let prague = TimeZone(identifier: "Europe/Prague") ?? .gmt
+        let enGB = Locale(identifier: "en_GB")
+        #expect(Formatters.shortDate(nov14Evening, locale: enGB, timeZone: prague) == "14 Nov 2026")
+        #expect(Formatters.shortDate(nov14Evening, locale: Locale(identifier: "en_US"), timeZone: prague) == "Nov 14, 2026")
+        #expect(Formatters.dayTitle(nov14Evening, locale: Locale(identifier: "en_CZ"), timeZone: prague) == "Saturday 14 November")
+        #expect(Formatters.dayTitle(nov14Evening, locale: Locale(identifier: "en_US"), timeZone: prague) == "Saturday, November 14")
+        #expect(Formatters.startTime(nov14Evening, locale: Locale(identifier: "en_CZ"), timeZone: prague) == "18:30")
+        #expect(Formatters.sessionStart(nov14Evening, locale: Locale(identifier: "en_CZ"), timeZone: prague)
+            .hasPrefix("Saturday 14 November 2026 at 18:30"))
+    }
+
+    @Test func dateTextsUseTheGivenTimeZone() {
+        // 18:30 in Prague is 17:30 UTC.
+        #expect(Formatters.startTime(nov14Evening, locale: Locale(identifier: "en_CZ"), timeZone: .gmt) == "17:30")
+    }
 }

@@ -13,7 +13,7 @@ concurrency:
 jobs:
   build-and-test:
     runs-on: xcode-27
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
 

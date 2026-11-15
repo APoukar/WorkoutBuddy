@@ -11,6 +11,7 @@ nonisolated struct UITestingLaunch: Equatable, Sendable {
         case inProgress
         case nothingDone
         case onSummary
+        case history
     }
 
     enum Store: String, Sendable {

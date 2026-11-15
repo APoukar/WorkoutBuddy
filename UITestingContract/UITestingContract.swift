@@ -1,3 +1,5 @@
+import Foundation
+
 /// Names shared by the app and the UI tests. This folder is a member of both targets, because the UI tests
 /// can't import the app module; a typo then fails to compile instead of failing a test at runtime.
 ///
@@ -28,6 +30,9 @@ nonisolated enum UITestingContract {
         static let nothingDone = "nothingDone"
         /// The templates and a finished "Long Rests" session with all sets done, waiting for Save.
         static let onSummary = "onSummary"
+        /// The templates and saved "Long Rests" sessions: two today, and one on the 15th of the previous month
+        /// (ended early: a changed set, a skipped set, a set never reached).
+        static let history = "history"
     }
 
     /// The seeded templates (every scenario except `empty`).
@@ -64,6 +69,8 @@ nonisolated enum UITestingContract {
         /// The large reps and kg controls, one adjustable element each (on the set screen and the review).
         static let repsControl = "session.reps"
         static let kgControl = "session.kg"
+        /// The session detail's Delete toolbar button (the confirmation alert has a button with the same label).
+        static let historyDeleteSession = "history.detail.delete"
     }
 
     /// The spoken forms XCUITest sees as labels and values (it matches what VoiceOver gets, not the visible text).
@@ -128,6 +135,62 @@ nonisolated enum UITestingContract {
         static let volumeAfterCorrectionAndMarkDone = "1,445 kilograms"
         /// The summary volume when only the Overhead Press set (8 x 40) is done.
         static let volumeOfOverheadOnly = "320 kilograms"
+    }
+
+    /// History (`en_US` region, which the UI tests launch with). XCUITest sees the calendar's day cells as buttons
+    /// labelled "Saturday, November 14" ("Today, Saturday, November 14" for today), and the month as a `Month`
+    /// button whose value is "November 2026". The date formats are pinned to `en_US` and the Gregorian calendar
+    /// like the launch arguments, so a test run on a Czech-region simulator still matches.
+    nonisolated enum History {
+        /// The calendar the tests use: the UI test runner doesn't get `-AppleLocale`, so `.current` could differ.
+        static var testCalendar: Calendar {
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = .current
+            return calendar
+        }
+        /// "Saturday, November 14": the day cell's label without the "Today, " prefix (tests match it with
+        /// `ENDSWITH`), the day list's navigation title and the date in the delete alert's message.
+        static func dayTitle(_ date: Date, calendar: Calendar = testCalendar) -> String {
+            format(date, "EEEE, MMMM d", calendar: calendar)
+        }
+        /// The start of the 15th of the month before `now`'s: the day of the `history` scenario's ended-early
+        /// session (the scenario puts it at 18:00). Every month has a 15th, so it always exists.
+        static func previousMonthFifteenth(now: Date, calendar: Calendar = testCalendar) -> Date {
+            let monthStart = calendar.dateInterval(of: .month, for: now)?.start ?? now
+            let previousMonth = calendar.date(byAdding: .month, value: -1, to: monthStart) ?? monthStart
+            return calendar.date(byAdding: .day, value: 14, to: previousMonth) ?? previousMonth
+        }
+        /// The `Month` button's value.
+        static func monthValue(_ date: Date, calendar: Calendar = testCalendar) -> String {
+            format(date, "MMMM yyyy", calendar: calendar)
+        }
+        /// The calendar's navigation buttons.
+        static let previousMonthIdentifier = "DatePicker.PreviousMonth"
+        static let monthButtonLabel = "Month"
+        /// The image the calendar draws under a day with a workout.
+        static let dotIdentifier = "circlebadge.fill"
+        static let tabLabel = "History"
+        static let deleteAlertTitle = "Delete Workout?"
+        static let deleteButton = "Delete"
+        static let endedEarly = "Ended early"
+        /// A day list row's label starts with the workout name and the start time: "Long Rests, 1:46 AM, 5 minutes".
+        static let dayRowPrefix = "\(Workout.longRests), "
+        /// The Volume row's value in the detail of the `history` session that ended early.
+        static let volumeOfEndedEarlySession = "650 kilograms"
+        /// The set rows of the detail, as VoiceOver reads them. The plan is added only where it differs.
+        static let setDoneAsPlanned = "Set 1, 10 reps at 60 kilograms"
+        static let setChangedKg = "Set 1, 10 reps at 65 kilograms, planned 10 reps at 60 kilograms"
+        static let setSkipped = "Set 2, skipped, planned 8 reps at 62.5 kilograms"
+        static let setNotPerformed = "Set 1, not performed, planned 8 reps at 40 kilograms"
+
+        private static func format(_ date: Date, _ pattern: String, calendar: Calendar) -> String {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US")
+            formatter.calendar = calendar
+            formatter.timeZone = calendar.timeZone
+            formatter.dateFormat = pattern
+            return formatter.string(from: date)
+        }
     }
 
     /// The `UserDefaults` suite the app reads its settings from in UI-testing mode.

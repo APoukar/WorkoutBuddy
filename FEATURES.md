@@ -72,9 +72,9 @@ A personal iPhone app for planning gym workouts, running them set by set with gu
 - **Back to Workout** returns to the workout from the summary. The time spent on the summary doesn't count towards the duration.
 
 ### F6 — History calendar
-- **History tab**: month calendar, swipeable between months, with today highlighted. Days with at least one finished session show a **dot**.
-- Tap a day with a dot to open the **session detail**. If there were several sessions that day, a short list of them is shown first.
-- **Session detail:** workout name, start time, duration and total volume. Each exercise lists its sets as actual `reps × kg`. Where the actual value differs from the plan, the plan is shown too. Skipped and not-performed sets are marked, and PR sets get a badge.
+- **History tab**: month calendar, swipeable between months (up to the current one), with today highlighted and a **Today** button. Days with at least one finished session show a **dot**. A session belongs to the day it started, even if it ran past midnight.
+- Tap a day with a dot to open the **session detail**. If there were several sessions that day, a short list of them is shown first, oldest first. Days without a session can't be tapped (except today, which stays highlighted).
+- **Session detail:** workout name, start time, duration and total volume, and "Ended early" for a session that was ended early. Each exercise lists its sets as actual `reps × kg`. Where the actual value differs from the plan, the plan is shown too. Skipped and not-performed sets are marked and show their plan, and PR sets get a badge.
 - A session can be deleted (with confirmation) to correct mistakes.
 
 ### F7 — Per-exercise progress charts

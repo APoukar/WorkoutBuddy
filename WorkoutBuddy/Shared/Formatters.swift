@@ -61,6 +61,36 @@ nonisolated enum Formatters {
         "\(Formatters.kg(kg, locale: locale)) \(kg == 1 ? "kilogram" : "kilograms")"
     }
 
+    // MARK: Dates and times
+
+    /// "12 Oct 2026" (en_GB), "Oct 12, 2026" (en_US). The date style of "Last done" and of the history texts.
+    static func shortDate(_ date: Date, locale: Locale = .current, timeZone: TimeZone = .current) -> String {
+        date.formatted(dateStyle(.abbreviated, time: .omitted, locale: locale, timeZone: timeZone))
+    }
+
+    /// "Saturday, 14 November 2026 at 18:30": the start of a saved session, in the session detail's header.
+    static func sessionStart(_ date: Date, locale: Locale = .current, timeZone: TimeZone = .current) -> String {
+        date.formatted(dateStyle(.complete, time: .shortened, locale: locale, timeZone: timeZone))
+    }
+
+    /// "18:30" or "6:30 PM": the start time in the day list's rows.
+    static func startTime(_ date: Date, locale: Locale = .current, timeZone: TimeZone = .current) -> String {
+        date.formatted(dateStyle(.omitted, time: .shortened, locale: locale, timeZone: timeZone))
+    }
+
+    /// "Saturday, 14 November": the day list's title and the delete message. No year, the calendar shows it.
+    static func dayTitle(_ date: Date, locale: Locale = .current, timeZone: TimeZone = .current) -> String {
+        let style = Date.FormatStyle(locale: locale, calendar: locale.calendar, timeZone: timeZone)
+            .weekday(.wide).day().month(.wide)
+        return date.formatted(style)
+    }
+
+    private static func dateStyle(
+        _ date: Date.FormatStyle.DateStyle, time: Date.FormatStyle.TimeStyle, locale: Locale, timeZone: TimeZone
+    ) -> Date.FormatStyle {
+        Date.FormatStyle(date: date, time: time, locale: locale, calendar: locale.calendar, timeZone: timeZone)
+    }
+
     private static func formattedWorkoutDuration(
         seconds: Int, width: Duration.UnitsFormatStyle.UnitWidth, locale: Locale
     ) -> String {

@@ -77,33 +77,35 @@ extension XCUIElement {
         return waitUntil(predicate, timeout: timeout)
     }
 
-    /// Waits for the element to settle (see `waitUntilSettled`); if that times out, waits up to 3 s (or
-    /// `timeout` if shorter, so a short caller timeout stays short) for a single read to find the element
-    /// present on screen, using the same screen frame as the settle wait. Returns whether the element is
-    /// present on screen afterwards (settled or not).
+    /// Waits for the element to settle (see `waitUntilSettled`); if that times out, waits up to another
+    /// `timeout` (so a short caller timeout stays short) for a single read to find the element present on
+    /// screen, using the same screen frame as the settle wait. The fallback window is not capped at a few
+    /// seconds because on CI one snapshot can take more than 3 s, and a shorter window produced no read at
+    /// all. Returns whether the element is present on screen afterwards (settled or not). A false result can
+    /// still mean a stalled snapshot rather than a missing element, so `tapSettled` taps anyway.
     func waitUntilSettledOrPresent(timeout: TimeInterval = defaultTimeout) -> Bool {
         let screen = XCUIApplication().frame
         if waitUntilSettled(screen: screen, timeout: timeout) { return true }
         let present = NSPredicate { evaluated, _ in
             MainActor.assumeIsolated { (evaluated as? XCUIElement)?.frameOnScreen(screen) != nil }
         }
-        return waitUntil(present, timeout: min(3, timeout))
+        return waitUntil(present, timeout: timeout)
     }
 }
 
 extension XCUIElement {
-    /// Waits for the element to settle (see `waitUntilSettledOrPresent`) and taps it. If the settle times out
-    /// the tap still happens as long as the element is present on screen; it fails (without tapping) only
-    /// when the element is missing, off screen or ambiguous (an ambiguous query makes `snapshot()` throw).
-    /// The settle only guards against tapping during an animation and none lasts 10 s; on CI snapshots can be
-    /// so slow that two matching reads don't fit in the timeout; callers check the effect of every tap. Use
-    /// for the first tap after a screen, alert or confirmation appeared.
-    func tapSettled(file: StaticString = #filePath, line: UInt = #line) {
-        guard waitUntilSettledOrPresent() else {
-            XCTFail("\(self) is missing, off screen or ambiguous (no non-empty frame in the app window) before the tap",
-                    file: file, line: line)
-            return
+    /// Waits for the element to settle (see `waitUntilSettledOrPresent`) and taps it. The settle only guards
+    /// against tapping during an animation, and none lasts 10 s. On CI snapshots of a busy screen (the History
+    /// calendar has about 42 day buttons) can stall for seconds, so neither the settle nor the fallback read
+    /// may complete although the element is there. When the wait returns false the tap therefore still happens,
+    /// inside an activity that shows in the results: `tap()` resolves the element through XCUITest's own waits
+    /// and fails with XCUITest's own error if it is really missing or ambiguous, and callers check the effect
+    /// of every tap. Use for the first tap after a screen, alert or confirmation appeared.
+    func tapSettled() {
+        if waitUntilSettledOrPresent() {
+            tap()
+        } else {
+            XCTContext.runActivity(named: "Not settled in time; tapping anyway") { _ in tap() }
         }
-        tap()
     }
 }
